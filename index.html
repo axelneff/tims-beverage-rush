@@ -148,7 +148,25 @@
     text-transform: uppercase;
   }
   .ticket-name { font-size: 22px; font-weight: 700; color: var(--tim-ink); margin: 2px 0 6px; line-height: 1.15; }
-  .ticket-steps { font-size: 14px; color: #6a4632; line-height: 1.45; font-weight: 500; }
+  .ticket-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
+  .ticket-stars { color: #e39b14; letter-spacing: 1px; font-size: 16px; font-weight: 700; }
+  .hint-badge {
+    background: #ffe1ea;
+    color: var(--tim-red-dark);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .mastery-track { height: 8px; background: #f3ddc0; border-radius: 999px; overflow: hidden; margin-bottom: 6px; border: 2px solid #fff; }
+  .mastery-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ffe08a, #e39b14); }
+  .ticket-steps { font-size: 14px; color: #6a4632; line-height: 1.45; font-weight: 500; white-space: pre-line; max-height: 9.2em; overflow: auto; }
+  .ticket-icons { display: none; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .ticket-icons span {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: #fff; border: 2px solid #f0d7b0;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
   .patience-bar {
     width: 100%;
     height: 12px;
@@ -251,6 +269,70 @@
     line-height: 1.3;
   }
   .toast-alert.success { background: #1faa62; box-shadow: 0 5px 0 #127a43; }
+  .toast-alert.soft { background: #e39b14; box-shadow: 0 5px 0 #a56d0c; }
+  #choicePanel {
+    position: absolute;
+    left: 50%;
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(560px, calc(100vw - 24px));
+    z-index: 24;
+    background: linear-gradient(#fffdfb, #fff3df);
+    border: 4px solid #fff;
+    border-radius: 22px;
+    padding: 10px 10px 12px;
+    box-shadow: 0 6px 0 #e8b56a, 0 16px 28px rgba(90, 40, 10, 0.16);
+    pointer-events: auto;
+  }
+  #choiceTitle { text-align: center; font-weight: 700; margin-bottom: 8px; }
+  #choiceGrid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .choice-btn {
+    pointer-events: auto;
+    border: 3px solid #fff;
+    background: linear-gradient(#fffdfb, #ffe7c2);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-family: var(--font);
+    font-weight: 700;
+    color: var(--tim-ink);
+    box-shadow: 0 3px 0 #e7c08a;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #unlockOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(74, 40, 24, 0.38);
+    pointer-events: auto;
+  }
+  .unlock-card {
+    width: min(420px, calc(100vw - 36px));
+    background: linear-gradient(#fffdfb, #fff1d4);
+    border: 4px solid #fff;
+    border-radius: 28px;
+    padding: 22px 18px 18px;
+    text-align: center;
+    box-shadow: 0 8px 0 #e8b56a;
+  }
+  .unlock-kicker { color: var(--tim-red); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; font-size: 13px; }
+  #unlockTitle { font-size: 28px; line-height: 1.15; margin: 8px 0; }
+  #unlockBody { color: #6a4632; font-weight: 600; margin-bottom: 14px; }
+  #unlockOk { font-size: 18px; padding: 10px 22px; }
+  #boot-error {
+    display: none;
+    position: absolute;
+    left: 12px; right: 12px; top: 12px;
+    z-index: 50;
+    background: #c8102e;
+    color: white;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 700;
+  }
 
   .joystick-zone {
     position: absolute;
@@ -370,11 +452,18 @@
       width: auto;
     }
     .ticket-name { font-size: 18px; }
-    .ticket-steps { font-size: 13px; }
+    .ticket-steps { font-size: 13px; max-height: 26vh; }
     .hud-bottom {
       left: 12px;
       right: 12px;
-      bottom: calc(340px + env(safe-area-inset-bottom));
+      top: calc(112px + env(safe-area-inset-top));
+      bottom: auto;
+    }
+    #choicePanel {
+      top: calc(108px + env(safe-area-inset-top));
+      bottom: auto;
+      max-height: 46vh;
+      overflow: auto;
     }
     .toast-alert { top: calc(118px + env(safe-area-inset-top)); }
     .use-btn { width: 78px; height: 78px; }
@@ -383,11 +472,14 @@
   }
 </style>
 <script src="three.min.js"></script>
+<script src="recipes.js"></script>
+<script src="game-rules.js"></script>
 </head>
 <body>
 
 <div id="canvas-container"></div>
 <div id="flash"></div>
+<div id="boot-error"></div>
 
 <div class="hud-top">
   <div class="brand-lockup">
@@ -404,17 +496,35 @@
 
 <div class="active-ticket" id="ticketCard">
   <div class="ticket-label">Order #<span id="ticketId">1</span></div>
-  <div class="ticket-name" id="ticketTitle">Medium Iced Capp</div>
-  <div class="ticket-steps" id="ticketSteps">1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle</div>
+  <div class="ticket-name" id="ticketTitle">Taking the next order</div>
+  <div class="ticket-meta">
+    <span class="ticket-stars" id="ticketStars">☆☆☆☆☆</span>
+    <span class="hint-badge" id="hintBadge">Build card</span>
+  </div>
+  <div class="mastery-track"><div class="mastery-fill" id="masteryMeter"></div></div>
+  <div class="ticket-steps" id="ticketSteps"></div>
+  <div class="ticket-icons" id="ticketIcons"></div>
   <div class="patience-bar">
     <div class="patience-fill" id="patienceFill"></div>
   </div>
   <div class="controls-help">
-    Stick, WASD, or a tap on the floor to walk. Stand in a ring, or press USE, to work the station.
+    Walk with the stick, WASD, or a tap on the floor. Stand in the right ring and it runs. USE tries the station you are on.
   </div>
 </div>
 
 <div class="toast-alert" id="toastAlert">Wrong sequence! Check build card.</div>
+<div id="choicePanel" style="display:none">
+  <div id="choiceTitle">Pick one</div>
+  <div id="choiceGrid"></div>
+</div>
+<div id="unlockOverlay">
+  <div class="unlock-card">
+    <div class="unlock-kicker">New on the menu</div>
+    <h2 id="unlockTitle">A new drink</h2>
+    <p id="unlockBody">Your regulars are asking for something new.</p>
+    <button type="button" id="unlockOk" class="choice-btn">Let's go</button>
+  </div>
+</div>
 <div class="combo-pop" id="comboPop"></div>
 
 <div class="hud-bottom">
@@ -610,15 +720,21 @@ addPlant(12.3, -8.6);
 
 // --- Stations Definition ---
 const stations = [
-  { id: 'cups', name: 'Cup Dispenser', color: 0xef4444, pos: [-9, 0, -8], action: 'Take Cup' },
-  { id: 'dairy', name: 'Dairy Fridge', color: 0xffffff, pos: [-4, 0, -8], action: 'Add Cream (Line 1)' },
-  { id: 'syrups', name: 'Syrup Pumps', color: 0x78350f, pos: [1, 0, -8], action: 'Add Chocolate Syrup' },
-  { id: 'lids', name: 'Dome Lid Dispenser', color: 0x93c5fd, pos: [6, 0, -8], action: 'Snap on Dome Lid' },
-  { id: 'javamix', name: 'Java Mix Machine', color: 0x92400e, pos: [10, 0, -5], action: 'Fill Java Mix (Line 4)' },
-  { id: 'blender', name: 'Whipper Spindle', color: 0xf59e0b, pos: [10, 0, 1], action: 'Whip 15s' },
-  { id: 'sanitize', name: 'Sanitizer Rinse Cup', color: 0x06b6d4, pos: [10, 0, 6], action: 'Sanitize Spindle' },
-  { id: 'counter', name: 'Order Counter & Guest', color: 0x10b981, pos: [-2, 0, 7], action: 'Serve to Guest' },
-  { id: 'trash', name: 'Trash Bin', color: 0x64748b, pos: [-11, 0, 7], action: 'Dump / Reset' }
+  { id: 'cups', name: 'Cups', color: 0xc8102e, pos: [-10.5, 0, -6.4], action: 'Grab a cup' },
+  { id: 'dairy', name: 'Dairy', color: 0x7ec8e3, pos: [-7, 0, -6.4], action: 'Add dairy' },
+  { id: 'syrups', name: 'Syrups', color: 0x6b3a22, pos: [-3.5, 0, -6.4], action: 'Pump syrup' },
+  { id: 'lids', name: 'Lids', color: 0x8fd4f8, pos: [0, 0, -6.4], action: 'Choose a lid' },
+  { id: 'ice', name: 'Ice', color: 0xb9e6ff, pos: [3.5, 0, -6.4], action: 'Add ice' },
+  { id: 'icedcoffee', name: 'Iced Coffee', color: 0x6b3a22, pos: [7, 0, -6.4], action: 'Pour iced coffee' },
+  { id: 'lemonade', name: 'Lemonade', color: 0xffd23a, pos: [10.5, 0, -6.4], action: 'Pour lemonade', hidden: true },
+  { id: 'javamix', name: 'Java Mix', color: 0x92400e, pos: [-10.5, 0, -1.6], action: 'Fill the machine' },
+  { id: 'stir', name: 'Stir', color: 0xf5b942, pos: [-7, 0, -1.6], action: 'Stir the cup' },
+  { id: 'topping', name: 'Topping', color: 0xfff6ea, pos: [-3.5, 0, -1.6], action: 'Add whipped topping' },
+  { id: 'drizzle', name: 'Drizzle', color: 0xe39a45, pos: [0, 0, -1.6], action: 'Add drizzle' },
+  { id: 'blender', name: 'Whipper', color: 0xf5b942, pos: [3.5, 0, -1.6], action: 'Whip 15 seconds' },
+  { id: 'sanitize', name: 'Sanitize', color: 0x06b6d4, pos: [7, 0, -1.6], action: 'Rinse the whipper' },
+  { id: 'trash', name: 'Trash', color: 0x64748b, pos: [10.5, 0, -1.6], action: 'Start the cup over' },
+  { id: 'counter', name: 'Hand-off', color: 0x10b981, pos: [0, 0, 6.2], action: 'Hand to the guest' }
 ];
 
 function addPart(parent, geo, material, x, y, z) {
@@ -664,6 +780,12 @@ function addLabel(group, st) {
   sprite.position.set(0, 3.05, 0);
   sprite.scale.set(2.65, 0.66, 1);
   group.add(sprite);
+}
+
+function addFillMarks(group, x, z, y0) {
+  for (let i = 0; i < 4; i++) {
+    addPart(group, new THREE.BoxGeometry(0.32, 0.035, 0.045), lit(i === 3 ? 0xc8102e : 0xfff6ea), x, y0 + i * 0.16, z);
+  }
 }
 
 function buildStationBody(st, group) {
@@ -714,6 +836,61 @@ function buildStationBody(st, group) {
     const nozzle = addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe8e8e8), 0, 1.15, 0.72);
     nozzle.rotation.x = Math.PI / 2;
     addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xc8102e), 0.32, 1.85, 0.5);
+    addFillMarks(group, 0, 0.68, 1.22);
+    return;
+  }
+  if (st.id === 'ice') {
+    addPlinth(group);
+    addPart(group, new THREE.BoxGeometry(1.15, 0.55, 0.9), lit(0x9fd4ef), 0, 1.05, 0);
+    addPart(group, new THREE.BoxGeometry(1.25, 0.12, 1.0), lit(0x7ec8e3), 0, 0.78, 0);
+    [[-0.28, 0.2], [0.05, 0.28], [0.3, 0.08], [-0.05, -0.12], [0.22, -0.2]].forEach((spot) => {
+      addPart(group, new THREE.BoxGeometry(0.22, 0.18, 0.18), lit(0xf7fbff), spot[0], 1.4, spot[1]);
+    });
+    return;
+  }
+  if (st.id === 'icedcoffee') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.42, 0.48, 1.55, 14), lit(0x4a2818), 0, 1.5, 0);
+    addPart(group, new THREE.CylinderGeometry(0.34, 0.36, 1.15, 14), lit(0x6b3a22), 0, 1.45, 0);
+    addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), lit(0xc8102e), 0, 2.2, 0);
+    const tap = addPart(group, new THREE.CylinderGeometry(0.06, 0.07, 0.28, 8), lit(0xfffdfb), 0, 1.15, 0.48);
+    tap.rotation.x = Math.PI / 2;
+    addFillMarks(group, 0.34, 0.28, 1.15);
+    return;
+  }
+  if (st.id === 'lemonade') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.42, 0.48, 1.55, 14), lit(0xfff3a0), 0, 1.5, 0);
+    addPart(group, new THREE.CylinderGeometry(0.34, 0.36, 1.15, 14), lit(0xffd23a), 0, 1.45, 0);
+    addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), lit(0xc8102e), 0, 2.2, 0);
+    addPart(group, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfff6ea), 0.22, 1.7, 0.22);
+    addFillMarks(group, 0.34, 0.28, 1.15);
+    return;
+  }
+  if (st.id === 'stir') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.34, 0.38, 0.7, 12), lit(0xfffdfb), 0, 1.1, 0);
+    addPart(group, new THREE.CylinderGeometry(0.38, 0.38, 0.1, 12), lit(0xc8102e), 0, 1.42, 0);
+    const spoon = addPart(group, new THREE.CylinderGeometry(0.035, 0.035, 0.85, 6), lit(0xf5b942), 0.16, 1.7, 0.05);
+    spoon.rotation.z = 0.4;
+    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xfffdfb), 0.32, 2.02, 0.05);
+    return;
+  }
+  if (st.id === 'topping') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.38, 0.42, 0.95, 12), lit(0xfffdfb), 0, 1.2, 0);
+    addPart(group, new THREE.CylinderGeometry(0.28, 0.28, 0.16, 12), lit(0xc8102e), 0, 1.72, 0);
+    addPart(group, new THREE.SphereGeometry(0.28, 12, 10), lit(0xfff6ea), 0, 1.95, 0);
+    addPart(group, new THREE.SphereGeometry(0.16, 10, 8), lit(0xffffff), 0.12, 2.18, 0.06);
+    return;
+  }
+  if (st.id === 'drizzle') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.2, 0.26, 0.9, 10), lit(0xc68642), -0.22, 1.2, 0);
+    addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe39a45), -0.22, 1.72, 0);
+    addPart(group, new THREE.CylinderGeometry(0.2, 0.26, 0.9, 10), lit(0x6b3a22), 0.22, 1.2, 0.05);
+    addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xf5b942), 0.22, 1.72, 0.05);
+    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xfffdfb), 0, 1.55, 0.28);
     return;
   }
   if (st.id === 'blender') {
@@ -759,9 +936,19 @@ stations.forEach(st => {
   group.add(ringMesh);
   addLabel(group, st);
 
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.28, 0.52, 10),
+    new THREE.MeshBasicMaterial({ color: 0x2f6bff })
+  );
+  arrow.position.set(0, 3.95, 0);
+  arrow.visible = false;
+  group.add(arrow);
+
   scene.add(group);
+  if (st.hidden) group.visible = false;
   st.mesh = group;
   st.ring = ringMesh;
+  st.arrow = arrow;
 });
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(() => labelRedraws.forEach((paint) => paint()));
@@ -864,10 +1051,28 @@ const cupMesh = new THREE.Mesh(
 cupMesh.castShadow = true;
 heldCupGroup.add(cupMesh);
 const cupBand = addPart(heldCupGroup, new THREE.CylinderGeometry(0.23, 0.23, 0.06, 12), lit(0xc8102e), 0, 0.02, 0);
+const fillMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.19, 0.15, 0.36, 12),
+  new THREE.MeshLambertMaterial({ color: 0xfff3d0 })
+);
+fillMesh.position.y = -0.05;
+fillMesh.visible = false;
+fillMesh.castShadow = true;
+heldCupGroup.add(fillMesh);
+const iceBits = [-0.08, 0.06, 0.01].map((x, i) => {
+  const bit = addPart(heldCupGroup, new THREE.BoxGeometry(0.08, 0.07, 0.07), lit(0xf7fbff), x, 0.16, i === 1 ? 0.05 : -0.02);
+  bit.visible = false;
+  return bit;
+});
 const lidTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0xd7f3ff), 0, 0.24, 0);
-const whipTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfffdfb), 0, 0.38, 0);
+const lidFlat = addPart(heldCupGroup, new THREE.CylinderGeometry(0.22, 0.22, 0.045, 12), lit(0xf4fbff), 0, 0.26, 0);
+const whipTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfffdfb), 0, 0.4, 0);
+const drizzleRing = addPart(heldCupGroup, new THREE.TorusGeometry(0.12, 0.025, 6, 10), lit(0xc68642), 0, 0.34, 0);
+drizzleRing.rotation.x = Math.PI / 2;
 lidTop.visible = false;
+lidFlat.visible = false;
 whipTop.visible = false;
+drizzleRing.visible = false;
 heldCupGroup.visible = false;
 playerGroup.add(heldCupGroup);
 
@@ -875,7 +1080,7 @@ scene.add(playerGroup);
 
 // Guest already waiting at the counter. Bubble keeps its original words.
 const customerGroup = new THREE.Group();
-customerGroup.position.set(-2, 0, 9.5);
+customerGroup.position.set(0, 0, 8.55);
 addPart(customerGroup, new THREE.CylinderGeometry(0.42, 0.48, 0.7, 14), lit(0x4aa3f0), 0, 0.7, 0);
 addPart(customerGroup, new THREE.SphereGeometry(0.5, 16, 14), skinMat, 0, 1.38, 0);
 addPart(customerGroup, new THREE.SphereGeometry(0.42, 12, 10), lit(0x6b3a22), 0, 1.68, -0.02);
@@ -888,24 +1093,30 @@ addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, -0.16, 1
 addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, 0.16, 1.42, 0.46);
 
 const bubbleCanvas = document.createElement('canvas');
-bubbleCanvas.width = 256;
-bubbleCanvas.height = 128;
+bubbleCanvas.width = 420;
+bubbleCanvas.height = 180;
+let bubbleLine1 = 'New order';
+let bubbleLine2 = 'coming up';
+let bubbleStars = '';
 function paintBubble() {
   const bctx = bubbleCanvas.getContext('2d');
-  bctx.clearRect(0, 0, 256, 128);
+  bctx.clearRect(0, 0, 420, 180);
   bctx.fillStyle = '#fffdfb';
-  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  canvasRoundRect(bctx, 8, 8, 404, 164, 46);
   bctx.fill();
   bctx.strokeStyle = '#c8102e';
   bctx.lineWidth = 8;
-  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  canvasRoundRect(bctx, 8, 8, 404, 164, 46);
   bctx.stroke();
   bctx.fillStyle = '#4a2818';
-  bctx.font = '700 30px Fredoka, Trebuchet MS, sans-serif';
+  bctx.font = '700 32px Fredoka, Trebuchet MS, sans-serif';
   bctx.textAlign = 'center';
   bctx.textBaseline = 'middle';
-  bctx.fillText('☕ Medium', 128, 46);
-  bctx.fillText('Iced Capp', 128, 84);
+  bctx.fillText(bubbleLine1, 210, 48);
+  bctx.fillText(bubbleLine2, 210, 92);
+  bctx.fillStyle = '#e39b14';
+  bctx.font = '700 28px Fredoka, Trebuchet MS, sans-serif';
+  bctx.fillText(bubbleStars, 210, 136);
   if (bubbleTex) bubbleTex.needsUpdate = true;
 }
 let bubbleTex = null;
@@ -913,61 +1124,66 @@ paintBubble();
 bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
 const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, transparent: true }));
 bubbleSprite.position.set(0, 2.45, 0);
-bubbleSprite.scale.set(2.15, 1.08, 1);
+bubbleSprite.scale.set(2.35, 1.12, 1);
 customerGroup.add(bubbleSprite);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintBubble);
 
 scene.add(customerGroup);
 
-// --- Drink Menu (Build Cards) ---
-const drinkMenu = [
-  {
-    name: 'Medium Iced Capp',
-    size: 'Medium',
-    needsSyrup: false,
-    needsWhip: true,
-    needsSanitize: true,
-    spec: '1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle'
-  },
-  {
-    name: 'Small Iced Capp Light',
-    size: 'Small',
-    needsSyrup: false,
-    needsWhip: true,
-    needsSanitize: true,
-    spec: '1. Small Cup → 2. 2% Milk L1 → 3. Dome Lid → 4. Java Mix L3 → 5. Whip 15s → 6. Sanitize Spindle'
-  },
-  {
-    name: 'Large Mocha Iced Capp Supreme',
-    size: 'Large',
-    needsSyrup: true,
-    needsWhip: true,
-    needsSanitize: true,
-    spec: '1. Large Cup → 2. Cream L1 → 3. Chocolate Syrup → 4. Dome Lid → 5. Java Mix L4 → 6. Whip 15s → 7. Chocolate Drizzle → 8. Sanitize Spindle'
-  }
-];
-
-function getRandomDrink() {
-  return drinkMenu[Math.floor(Math.random() * drinkMenu.length)];
-}
-
-// --- Game State & Rules ---
+// --- Orders from the real build cards ---
+const SAVE_KEY = 'tbr-progress';
+let progress = { v: 1, unlockedThrough: 0, seen: 0, drinks: {} };
+let order = null;
+let cursor = 0;
+let orderClean = true;
+let bonusLost = false;
+let startedHintsOff = false;
+let ticketNumber = 1;
+let ticketTimer = 35;
+let choiceOpen = false;
+let unlockOpen = false;
+let resumeAfterUnlock = false;
 let score = 0;
 let revenue = 0;
 let streak = 0;
-let ticketTimer = 35;
-let currentTicket = getRandomDrink();
 
-let heldItem = {
-  hasCup: false,
-  size: null,
-  dairy: null,
-  syrup: null,
-  lid: null,
-  javaMix: false,
-  whipped: false,
-  sanitized: false
-};
+function emptyHands() {
+  return {
+    hasCup: false,
+    size: null,
+    oz: null,
+    dairy: null,
+    syrup: null,
+    liquid: null,
+    line: 0,
+    lid: null,
+    blended: false,
+    sanitized: false,
+    ice: false,
+    topping: false,
+    drizzle: null
+  };
+}
+let heldItem = emptyHands();
+
+function loadProgress() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (raw && raw.v === 1 && raw.drinks) return raw;
+  } catch (err) {}
+  return { v: 1, unlockedThrough: 0, seen: 0, drinks: {} };
+}
+function saveProgress() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (err) {}
+}
+function drinkRecord() {
+  if (!order) return { mastery: 0, mastered: false, reviewEvery: 3, ordersUntilReview: 3, wrongStep: null };
+  if (!progress.drinks[order.id]) {
+    progress.drinks[order.id] = { mastery: 0, mastered: false, reviewEvery: 3, ordersUntilReview: 3, wrongStep: null };
+  }
+  return progress.drinks[order.id];
+}
+
 
 // Movement Controls
 const keys = {};
@@ -1015,54 +1231,170 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let targetPosition = null;
 
+function stationFromObject(obj) {
+  while (obj) {
+    const found = stations.find((st) => st.mesh === obj);
+    if (found) return found;
+    obj = obj.parent;
+  }
+  return null;
+}
+
 window.addEventListener('pointerdown', e => {
   unlockAudio();
-  if (e.target.closest('#joystickZone, .hud-top, button, .use-btn, .icon-btn')) return;
+  if (e.target.closest('#joystickZone, .hud-top, button, .use-btn, .icon-btn, #choicePanel, #unlockOverlay')) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
+  const visible = stations.filter((st) => st.mesh.visible).map((st) => st.mesh);
+  const stationHits = raycaster.intersectObjects(visible, true);
+  const clicked = stationHits.length ? stationFromObject(stationHits[0].object) : null;
+  if (clicked) {
+    targetPosition = new THREE.Vector3(clicked.pos[0], 0, clicked.pos[2] + 0.15);
+    return;
+  }
   const intersects = raycaster.intersectObject(floor);
   if (intersects.length > 0) {
     targetPosition = intersects[0].point;
   }
 });
 
-function showAlert(text, success = false) {
+function showAlert(text, success) {
   const alert = document.getElementById('toastAlert');
   alert.textContent = text;
-  alert.className = 'toast-alert' + (success ? ' success' : '');
+  const mode = success === 'soft' ? ' soft' : success ? ' success' : '';
+  alert.className = 'toast-alert' + mode;
   alert.style.display = 'block';
-  setTimeout(() => { alert.style.display = 'none'; }, 2800);
+  clearTimeout(showAlert.timer);
+  showAlert.timer = setTimeout(() => { alert.style.display = 'none'; }, 3200);
   reactToAlert(text, success);
 }
 
-function nextTicket() {
-  lastJuiceKey = '';
-  currentTicket = getRandomDrink();
-  heldItem = {
-    hasCup: false,
-    size: null,
-    dairy: null,
-    syrup: null,
-    lid: null,
-    javaMix: false,
-    whipped: false,
-    sanitized: false
+function lineCount(fill) {
+  if (fill === '2nd') return 2;
+  if (fill === '3rd') return 3;
+  if (fill === '4th' || fill === 'rim') return 4;
+  return 1;
+}
+
+function closeChoices() {
+  choiceOpen = false;
+  const panel = document.getElementById('choicePanel');
+  if (panel) panel.style.display = 'none';
+}
+
+function openChoices(step) {
+  const choices = TBR.choicesFor(step);
+  const panel = document.getElementById('choicePanel');
+  const grid = document.getElementById('choiceGrid');
+  const titles = {
+    cups: 'Which cup?',
+    dairy: 'Dairy',
+    syrups: 'Syrup pumps',
+    lids: 'Which lid?',
+    javamix: 'Java Mix machine',
+    icedcoffee: 'Iced coffee',
+    lemonade: 'Lemonade',
+    drizzle: 'Drizzle'
   };
-  ticketTimer = 35;
+  document.getElementById('choiceTitle').textContent = titles[step.stationId] || 'Pick one';
+  grid.innerHTML = '';
+  choices.forEach((choice) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'choice-btn';
+    btn.textContent = choice.label;
+    btn.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeChoices();
+      if (TBR.choiceOk(step, choice.id)) finishStep(step);
+      else miss(step);
+    });
+    grid.appendChild(btn);
+  });
+  panel.style.display = 'block';
+  choiceOpen = true;
+}
+
+function paintHands(step) {
+  if (step.stationId === 'cups') {
+    heldItem.hasCup = true;
+    heldItem.size = step.accept.size;
+    heldItem.oz = step.oz;
+  } else if (step.stationId === 'dairy') {
+    heldItem.dairy = step.hint;
+    heldItem.liquid = heldItem.liquid || 'dairy';
+    heldItem.line = Math.max(heldItem.line, lineCount(step.accept.fill));
+  } else if (step.stationId === 'syrups') {
+    heldItem.syrup = step.hint;
+  } else if (step.stationId === 'javamix') {
+    heldItem.liquid = 'java';
+    heldItem.line = lineCount(step.accept.fill);
+  } else if (step.stationId === 'icedcoffee') {
+    heldItem.liquid = 'coffee';
+    heldItem.line = lineCount(step.accept.fill);
+  } else if (step.stationId === 'lemonade') {
+    heldItem.liquid = 'lemon';
+    heldItem.line = lineCount(step.accept.fill);
+  } else if (step.kind === 'lid') {
+    heldItem.lid = step.accept.lid;
+  } else if (step.stationId === 'blender') {
+    heldItem.blended = true;
+  } else if (step.stationId === 'sanitize') {
+    heldItem.sanitized = true;
+  } else if (step.stationId === 'ice') {
+    heldItem.ice = true;
+  } else if (step.stationId === 'topping') {
+    heldItem.topping = true;
+  } else if (step.stationId === 'drizzle') {
+    heldItem.drizzle = step.accept.ingredient || 'Caramel';
+  }
+}
+
+function miss(step) {
+  orderClean = false;
+  const rec = drinkRecord();
+  rec.wrongStep = step.hint;
+  TBR.dropStage(rec);
+  saveProgress();
   updateTicketDisplay();
   updateHeldDisplay();
-  showAlert('🎫 New Order! ' + currentTicket.name, true);
+  showAlert('Correct step: ' + step.hint, false);
+}
+
+function finishStep(step) {
+  paintHands(step);
+  cursor += 1;
+  updateHeldDisplay();
+  if (step.stationId === 'counter' || cursor >= order.steps.length) completeOrder();
+  else updateTicketDisplay();
 }
 
 function updateTicketDisplay() {
-  document.getElementById('ticketTitle').textContent = currentTicket.name;
-  document.getElementById('ticketSteps').textContent = currentTicket.spec;
-  const timerEl = document.getElementById('timerVal');
-  if (timerEl) {
-    const secs = Math.max(0, Math.round(ticketTimer));
-    timerEl.textContent = '0:' + String(secs).padStart(2, '0');
-  }
+  if (!order) return;
+  const mastery = drinkRecord().mastery || 0;
+  const view = TBR.ticketView(order, mastery);
+  document.getElementById('ticketId').textContent = String(ticketNumber);
+  document.getElementById('ticketTitle').textContent = order.name;
+  document.getElementById('ticketStars').textContent = view.stars;
+  document.getElementById('hintBadge').textContent = view.label;
+  document.getElementById('masteryMeter').style.width = Math.round(mastery) + '%';
+  document.getElementById('ticketSteps').textContent = view.lines.join('\n');
+  const icons = document.getElementById('ticketIcons');
+  icons.innerHTML = '';
+  view.icons.forEach((icon) => {
+    const span = document.createElement('span');
+    span.textContent = icon;
+    icons.appendChild(span);
+  });
+  icons.style.display = view.icons.length ? 'flex' : 'none';
+  const secs = Math.max(0, Math.ceil(ticketTimer));
+  document.getElementById('timerVal').textContent = '0:' + String(secs).padStart(2, '0');
+  bubbleLine1 = order.bubble.line1;
+  bubbleLine2 = order.bubble.line2;
+  bubbleStars = view.stars;
+  paintBubble();
 }
 
 function updateHeldDisplay() {
@@ -1074,142 +1406,218 @@ function updateHeldDisplay() {
   }
   card.style.display = 'flex';
   heldCupGroup.visible = true;
+  const bits = [heldItem.size + ' cup'];
+  if (heldItem.dairy) bits.push(heldItem.dairy);
+  if (heldItem.syrup) bits.push(heldItem.syrup);
+  if (heldItem.liquid === 'java') bits.push('Java Mix');
+  if (heldItem.liquid === 'coffee') bits.push('Iced coffee');
+  if (heldItem.liquid === 'lemon') bits.push('Lemonade');
+  if (heldItem.lid) bits.push(heldItem.lid + ' lid');
+  if (heldItem.blended) bits.push('Whipped');
+  if (heldItem.sanitized) bits.push('Rinsed');
+  if (heldItem.ice) bits.push('Ice');
+  if (heldItem.topping) bits.push('Topping');
+  if (heldItem.drizzle) bits.push('Drizzle');
+  document.getElementById('heldItemTitle').textContent = bits.join(' · ');
+  const view = order ? TBR.ticketView(order, drinkRecord().mastery || 0) : null;
+  const next = order && order.steps[cursor];
+  const tag = document.getElementById('heldStatusTag');
+  if (view && view.stage <= 1 && next) tag.textContent = next.hint;
+  else tag.textContent = 'In your hands';
 
-  let title = `${heldItem.size || ''} Cup`;
-  if (heldItem.dairy) title += ` + ${heldItem.dairy}`;
-  if (heldItem.syrup) title += ' + Choc Syrup';
-  if (heldItem.lid) title += ' + Dome Lid';
-  if (heldItem.javaMix) title += ' + Java Mix';
-  if (heldItem.whipped) title += ' (Whipped!)';
-
-  document.getElementById('heldItemTitle').textContent = title;
-  
-  // Next Recommended Step Hint
-  let nextHint = 'Go to Counter';
-  if (!heldItem.dairy) nextHint = 'Next: Go to Dairy Fridge';
-  else if (!heldItem.lid) nextHint = 'Next: Snap on Dome Lid';
-  else if (!heldItem.javaMix) nextHint = 'Next: Fill Java Mix';
-  else if (!heldItem.whipped) nextHint = 'Next: Go to Whipper Spindle';
-  else if (!heldItem.sanitized) nextHint = 'Next: Sanitize Spindle!';
-  document.getElementById('heldStatusTag').textContent = nextHint;
-
-  if (heldItem.javaMix) cupMesh.material.color.setHex(0xc68642);
-  else if (heldItem.dairy) cupMesh.material.color.setHex(0xf6e7c1);
-  else cupMesh.material.color.setHex(0xffffff);
-  lidTop.visible = !!heldItem.lid;
-  whipTop.visible = !!heldItem.whipped;
+  const scales = { Small: 0.86, Medium: 1, Large: 1.14, 'X-Large': 1.24 };
+  const cupScale = scales[heldItem.size] || 1;
+  heldCupGroup.scale.set(cupScale, cupScale, cupScale);
+  const colors = { dairy: 0xfff3d0, java: 0xc68642, coffee: 0x4a2818, lemon: 0xffd23a };
+  if (heldItem.liquid) {
+    fillMesh.visible = true;
+    fillMesh.material.color.setHex(heldItem.blended ? 0xd7a15a : colors[heldItem.liquid]);
+    const height = [0.34, 0.34, 0.55, 0.78, 1][heldItem.line] || 0.45;
+    fillMesh.scale.y = height;
+    fillMesh.position.y = -0.18 + height * 0.16;
+  } else {
+    fillMesh.visible = false;
+  }
+  iceBits.forEach((bit) => { bit.visible = !!heldItem.ice; });
+  lidTop.visible = heldItem.lid === 'Dome';
+  lidFlat.visible = heldItem.lid === 'Strawless' || heldItem.lid === 'Hot';
+  if (lidFlat.visible) lidFlat.material.color.setHex(heldItem.lid === 'Hot' ? 0xfffdfb : 0xd7f3ff);
+  whipTop.visible = !!heldItem.topping;
+  drizzleRing.visible = !!heldItem.drizzle;
+  if (heldItem.drizzle) {
+    const tone = /chocolate/i.test(heldItem.drizzle) ? 0x4a2818 : /vanilla/i.test(heldItem.drizzle) ? 0xfff3d0 : 0xc68642;
+    drizzleRing.material.color.setHex(tone);
+  }
 }
 
-// Station Interaction Handlers
+function revealUnlockedStations() {
+  const showLemon = (progress.unlockedThrough || 0) >= 1;
+  stations.forEach((st) => {
+    if (st.id !== 'lemonade') return;
+    const was = st.mesh.visible;
+    st.hidden = !showLemon;
+    st.mesh.visible = showLemon;
+    if (showLemon && !was) stationSquash[st.id] = 1;
+  });
+}
+
+function openUnlock(tier) {
+  progress.unlockedThrough = tier;
+  TBR.ensureRecords(progress);
+  saveProgress();
+  revealUnlockedStations();
+  unlockOpen = true;
+  resumeAfterUnlock = true;
+  const names = TBR.tierExposable(tier).map((id) => TBR.drinkName(id));
+  document.getElementById('unlockTitle').textContent = names.join(' · ');
+  document.getElementById('unlockBody').textContent = 'Your regulars are asking for something new.';
+  document.getElementById('unlockOverlay').style.display = 'flex';
+  burstSparkles();
+  playServe();
+}
+
+function maybeUnlock() {
+  const next = TBR.peekUnlock(progress);
+  if (next === -1) return false;
+  openUnlock(next);
+  return true;
+}
+
+function hideAlert() {
+  const alert = document.getElementById('toastAlert');
+  if (alert) alert.style.display = 'none';
+  clearTimeout(showAlert.timer);
+}
+
+function startOrder(isFirst) {
+  closeChoices();
+  hideAlert();
+  order = TBR.pickOrder(progress);
+  TBR.noteOrder(progress, order.id);
+  TBR.ensureRecords(progress);
+  cursor = 0;
+  orderClean = true;
+  bonusLost = false;
+  startedHintsOff = TBR.hintStage(drinkRecord().mastery || 0) === 4;
+  ticketTimer = TBR.ORDER_SECONDS;
+  heldItem = emptyHands();
+  if (!isFirst) ticketNumber += 1;
+  saveProgress();
+  updateTicketDisplay();
+  updateHeldDisplay();
+  showAlert('🎫 New Order! ' + order.name, true);
+}
+
+function completeOrder() {
+  const inTime = !bonusLost;
+  const result = TBR.scoreFor(orderClean, inTime);
+  const rec = drinkRecord();
+  if (orderClean) rec.wrongStep = null;
+  TBR.grantMastery(rec, { clean: orderClean, inTime: inTime, hintsOff: startedHintsOff });
+  score += result.points;
+  revenue += result.revenue;
+  document.getElementById('scoreVal').textContent = String(score);
+  document.getElementById('revenueVal').textContent = revenue.toFixed(2);
+  customerGroup.position.y = 0.55;
+  setTimeout(() => { customerGroup.position.y = 0; }, 320);
+  saveProgress();
+  if (result.perfect) showAlert('Perfect Build! Customer served! (+150 pts)', true);
+  else if (orderClean) showAlert('Served! The time bonus already left.', 'soft');
+  else showAlert('Served — the cup still made it.', 'soft');
+  if (maybeUnlock()) return;
+  setTimeout(() => { if (!unlockOpen) startOrder(false); }, 700);
+}
+
 function interactWithStation(st) {
+  if (unlockOpen || !order) return;
   bounceStation(st);
   bouncePlayer();
-  if (st.id === 'cups') {
-    if (heldItem.hasCup) {
-      showAlert('You are already holding a cup!');
-      return;
-    }
-    heldItem.hasCup = true;
-    heldItem.size = 'Medium';
-    showAlert('Grabbed Medium Cup!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'dairy') {
-    if (!heldItem.hasCup) { showAlert('Grab a cup first!'); return; }
-    if (heldItem.javaMix) { showAlert('Build Card Rule: Dairy must be added to Line 1 BEFORE Java Mix!'); return; }
-    if (heldItem.dairy) { showAlert('Dairy already filled to Line 1!'); return; }
-    heldItem.dairy = 'Cream';
-    showAlert('Filled Cream to Line 1!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'syrups') {
-    if (!heldItem.hasCup || !heldItem.dairy) { showAlert('Add dairy first before syrups!'); return; }
-    heldItem.syrup = 'Chocolate';
-    showAlert('Added 3 pumps Chocolate Syrup!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'lids') {
-    if (!heldItem.hasCup) { showAlert('Pick up a cup first!'); return; }
-    if (heldItem.lid) { showAlert('Dome lid already snapped on!'); return; }
-    heldItem.lid = 'Dome';
-    showAlert('Snapped on Dome Lid!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'javamix') {
-    if (!heldItem.dairy) { showAlert('Rule: Dairy to Line 1 before Java Mix!'); return; }
-    if (!heldItem.lid) { showAlert('Safety Rule: DOME LID must be on cup before filling Java Mix!'); return; }
-    if (heldItem.javaMix) { showAlert('Java Mix already filled to Line 4!'); return; }
-    heldItem.javaMix = true;
-    showAlert('Dispensed Java Mix to Line 4!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'blender') {
-    if (!heldItem.javaMix) { showAlert('Fill Java Mix before whipping!'); return; }
-    if (heldItem.lid !== 'Dome') { showAlert('Safety Violation: Dome lid must be sealed before inserting in whipper!'); return; }
-    if (heldItem.whipped) { showAlert('Drink is already whipped!'); return; }
-    heldItem.whipped = true;
-    heldItem.sanitized = false; // Flag that spindle needs cleaning
-    showAlert('Whipped 15s on spindle! MUST sanitize spindle next!', true);
-    updateHeldDisplay();
-    return;
-  }
-
-  if (st.id === 'sanitize') {
-    if (!heldItem.whipped) { showAlert('Sanitize is done AFTER whipping!'); return; }
-    heldItem.sanitized = true;
-    showAlert('Whipper spindle sanitized in rinse cup!', true);
-    updateHeldDisplay();
-    return;
-  }
-
+  if (choiceOpen) return;
   if (st.id === 'trash') {
-    heldItem = { hasCup: false, size: null, dairy: null, syrup: null, lid: null, javaMix: false, whipped: false, sanitized: false };
-    showAlert('Cup discarded. Start fresh!');
+    cursor = 0;
+    heldItem = emptyHands();
     updateHeldDisplay();
+    showAlert('Fresh cup. Same order.', 'soft');
     return;
   }
-
-  if (st.id === 'counter') {
-    if (!heldItem.hasCup) { showAlert('Take an order and make the drink!'); return; }
-    // Validation
-    const mistakes = [];
-    if (!heldItem.dairy) mistakes.push('Missing Dairy (Cream L1)');
-    if (!heldItem.lid) mistakes.push('Missing Dome Lid');
-    if (!heldItem.javaMix) mistakes.push('Missing Java Mix');
-    if (!heldItem.whipped) mistakes.push('Not whipped');
-    if (!heldItem.sanitized) mistakes.push('Did not sanitize spindle!');
-
-    if (mistakes.length > 0) {
-      showAlert('Build Card Violation: ' + mistakes[0]);
-      return;
-    }
-
-    // Success!
-    score += 150;
-    revenue += 4.29;
-    document.getElementById('scoreVal').textContent = score;
-    document.getElementById('revenueVal').textContent = revenue.toFixed(2);
-    showAlert('Perfect Build! Customer served! (+$150 pts)', true);
-
-    // Customer happy bounce animation
-    customerGroup.position.y = 0.8;
-    setTimeout(() => { customerGroup.position.y = 0; }, 300);
-
-    // Get NEXT randomized drink
-    setTimeout(() => { nextTicket(); }, 500);
+  const step = order.steps[cursor];
+  if (!step) return;
+  if (st.id !== step.stationId) {
+    miss(step);
     return;
   }
+  if (step.kind === 'simple') finishStep(step);
+  else openChoices(step);
 }
+
+function bootCafe() {
+  progress = loadProgress();
+  TBR.ensureRecords(progress);
+  playerGroup.position.set(0, 0, 2.2);
+  revealUnlockedStations();
+  document.getElementById('unlockOk').addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    unlockOpen = false;
+    document.getElementById('unlockOverlay').style.display = 'none';
+    if (resumeAfterUnlock) {
+      resumeAfterUnlock = false;
+      startOrder(false);
+    }
+  });
+  startOrder(true);
+  if (maybeUnlock()) return;
+  window.TBR_DEBUG = {
+    setMastery: function (id, mastery) {
+      TBR.ensureRecords(progress);
+      if (!progress.drinks[id]) {
+        progress.drinks[id] = { mastery: 0, mastered: false, reviewEvery: 3, ordersUntilReview: 3, wrongStep: null };
+      }
+      progress.drinks[id].mastery = mastery;
+      progress.drinks[id].mastered = mastery >= 80;
+      saveProgress();
+      startOrder(false);
+    },
+    readyTier: function () {
+      TBR.tierExposable(progress.unlockedThrough).forEach((id) => {
+        progress.drinks[id].mastery = 60;
+        progress.drinks[id].mastered = false;
+      });
+      saveProgress();
+      maybeUnlock();
+    },
+    preview: function (id, mastery, size) {
+      const chosen = size || 'Medium';
+      TBR.ensureRecords(progress);
+      if (!progress.drinks[id]) {
+        progress.drinks[id] = { mastery: 0, mastered: false, reviewEvery: 3, ordersUntilReview: 3, wrongStep: null };
+      }
+      progress.drinks[id].mastery = mastery;
+      progress.drinks[id].mastered = mastery >= 80;
+      const drink = TBR.byId[id];
+      const build = drink.builds.filter((item) => item.size === chosen)[0];
+      order = {
+        id: id,
+        name: chosen + ' ' + drink.name,
+        size: chosen,
+        oz: build.cup_oz,
+        flavor: false,
+        steps: TBR.expandBuild(drink, chosen, { flavor: false }),
+        bubble: { line1: chosen + ' · ' + build.cup_oz + ' oz', line2: drink.name }
+      };
+      cursor = 0;
+      orderClean = true;
+      bonusLost = false;
+      startedHintsOff = TBR.hintStage(mastery) === 4;
+      ticketTimer = TBR.ORDER_SECONDS;
+      heldItem = emptyHands();
+      hideAlert();
+      updateTicketDisplay();
+      updateHeldDisplay();
+    }
+  };
+}
+
 
 // Juice stays out of Math.random so drink picks are unchanged.
 // Later passes can hang customers, coins, and XP off score / streak / currentTicket.
@@ -1350,7 +1758,9 @@ function mistakeFx() {
   buzz(16);
 }
 function reactToAlert(text, success) {
-  const always = text.indexOf('Perfect Build') !== -1 || text.indexOf('New Order') !== -1;
+  if (success === 'soft') return;
+  const failure = !success;
+  const always = text.indexOf('Perfect Build') !== -1 || text.indexOf('New Order') !== -1 || failure;
   if (!always && text === lastJuiceKey) return;
   lastJuiceKey = text;
   if (text.indexOf('Perfect Build') !== -1) {
@@ -1370,14 +1780,11 @@ function reactToAlert(text, success) {
     card.classList.add('pop');
     return;
   }
-  if (text.indexOf('Build Card Violation') !== -1) {
-    streak = 0;
-    paintStreak();
-    mistakeFx();
-    playBad();
-    return;
-  }
-  if (!success) {
+  if (failure) {
+    if (streak) {
+      streak = 0;
+      paintStreak();
+    }
     mistakeFx();
     playBad();
     return;
@@ -1421,8 +1828,35 @@ document.getElementById('useBtn').addEventListener('pointerdown', (e) => {
 let activeStation = null;
 let lastInteractionTime = 0;
 
-function animate() {
+function animate(now) {
   requestAnimationFrame(animate);
+  if (!now) now = performance.now();
+  if (!animate.last) animate.last = now;
+  const dt = Math.min(0.05, (now - animate.last) / 1000);
+  animate.last = now;
+  if (order && !unlockOpen && !bonusLost) {
+    ticketTimer -= dt;
+    if (ticketTimer <= 0) {
+      ticketTimer = 0;
+      bonusLost = true;
+      showAlert('Time bonus slipped away — finish the cup!', 'soft');
+    }
+  }
+  const secs = Math.max(0, Math.ceil(ticketTimer || 0));
+  const timerEl = document.getElementById('timerVal');
+  if (timerEl && timerEl.textContent !== '0:' + String(secs).padStart(2, '0')) {
+    timerEl.textContent = '0:' + String(secs).padStart(2, '0');
+  }
+  const patience = document.getElementById('patienceFill');
+  if (patience) {
+    const pct = Math.max(0, (ticketTimer || 0) / TBR.ORDER_SECONDS) * 100;
+    patience.style.width = pct + '%';
+    patience.style.background = pct > 50
+      ? 'linear-gradient(90deg, #7ddea8, #2fbe73)'
+      : pct > 20
+        ? 'linear-gradient(90deg, #ffe08a, #e39b14)'
+        : 'linear-gradient(90deg, #ffb4c0, #e45b78)';
+  }
 
   // Keyboard / Vector Movement
   let vx = 0, vz = 0;
@@ -1449,16 +1883,18 @@ function animate() {
     }
   }
 
-  const speed = 0.18;
+  let speed = joystickActive ? 0.16 : 0.14;
+  if (!joystickActive && vx !== 0 || !joystickActive && vz !== 0) {
+    const easing = stations.some((st) => st.mesh.visible && Math.hypot(playerGroup.position.x - st.pos[0], playerGroup.position.z - st.pos[2]) < 2.3);
+    if (easing) speed = 0.055;
+  }
   if (vx !== 0 || vz !== 0) {
     playerGroup.position.x += vx * speed;
     playerGroup.position.z += vz * speed;
 
-    // Bounds checking
-    playerGroup.position.x = Math.max(-12, Math.min(12, playerGroup.position.x));
-    playerGroup.position.z = Math.max(-9, Math.min(9, playerGroup.position.z));
+    playerGroup.position.x = Math.max(-11.6, Math.min(11.6, playerGroup.position.x));
+    playerGroup.position.z = Math.max(-8.15, Math.min(8.15, playerGroup.position.z));
 
-    // Rotate player to face movement direction
     const angle = Math.atan2(vx, vz);
     playerGroup.rotation.y = angle;
 
@@ -1467,37 +1903,59 @@ function animate() {
     bodyMesh.position.y = BODY_REST_Y + Math.sin(Date.now() * 0.003) * 0.02;
   }
 
-  // Visual-only arm swing. Does not change position, facing, or speed.
   const walking = vx !== 0 || vz !== 0;
   const swing = walking ? Math.sin(Date.now() * 0.012) * 0.4 : 0;
   armPivotL.rotation.x = ARM_REST_X + swing;
   armPivotR.rotation.x = ARM_REST_X - swing;
 
-  // Station Proximity & Interaction Zone Detection
+  const step = order && order.steps[cursor];
+  const glowOn = !!(step && order && TBR.ticketView(order, drinkRecord().mastery || 0).glow);
   let nearbyStation = null;
+  let nearbyDist = 1.85;
   stations.forEach(st => {
+    if (!st.mesh.visible) {
+      if (st.arrow) st.arrow.visible = false;
+      return;
+    }
     const dist = Math.hypot(playerGroup.position.x - st.pos[0], playerGroup.position.z - st.pos[2]);
-    if (dist < 2.4) {
-      nearbyStation = st;
-      st.ring.material.opacity = 1.0;
-      st.ring.scale.set(1.15, 1.15, 1);
+    const glowing = glowOn && step && st.id === step.stationId;
+    if (st.arrow) {
+      st.arrow.visible = glowing;
+      if (glowing) st.arrow.position.y = 3.85 + Math.sin(Date.now() * 0.006) * 0.18;
+    }
+    if (glowing) {
+      st.ring.material.color.setHex(0x2f6bff);
+      st.ring.material.opacity = 1;
+      const pulse = 1.35 + Math.sin(Date.now() * 0.01) * 0.18;
+      st.ring.scale.set(pulse, pulse, 1);
+    } else if (dist < nearbyDist) {
+      st.ring.material.color.setHex(st.color);
+      st.ring.material.opacity = 0.95;
+      st.ring.scale.set(1.08, 1.08, 1);
     } else {
-      st.ring.material.opacity = 0.4;
+      st.ring.material.color.setHex(st.color);
+      st.ring.material.opacity = 0.38;
       st.ring.scale.set(1, 1, 1);
     }
+    if (dist < nearbyDist) {
+      nearbyStation = st;
+      nearbyDist = dist;
+    }
   });
+
+  if (choiceOpen && (!nearbyStation || !step || nearbyStation.id !== step.stationId)) closeChoices();
 
   activeStation = nearbyStation;
   const promptElem = document.getElementById('promptText');
   if (nearbyStation) {
-    promptElem.textContent = `STAND HERE TO: ${nearbyStation.action.toUpperCase()}`;
+    const here = step && nearbyStation.id === step.stationId;
+    promptElem.textContent = (here ? 'HERE · ' : 'USE · ') + nearbyStation.action.toUpperCase();
     promptElem.style.display = 'block';
     if (stepRingWrap) stepRingWrap.style.display = 'block';
     const cooled = Math.min(1, (Date.now() - lastInteractionTime) / 1100);
     if (stepRing) stepRing.style.strokeDashoffset = String(100.5 * (1 - cooled));
 
-    // Auto-trigger when standing still in circle
-    if (Date.now() - lastInteractionTime > 1100) {
+    if (!choiceOpen && !unlockOpen && here && Date.now() - lastInteractionTime > 1100) {
       interactWithStation(nearbyStation);
       lastInteractionTime = Date.now();
     }
@@ -1537,10 +1995,17 @@ function frameCamera() {
 window.addEventListener('resize', frameCamera);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', frameCamera);
 
-// Show the drink that was actually drawn. The 35s timer stays put; this only prints it.
-updateTicketDisplay();
+try {
+  bootCafe();
+} catch (err) {
+  console.error(err);
+  const boot = document.getElementById('boot-error');
+  if (boot) {
+    boot.style.display = 'block';
+    boot.textContent = err && err.message ? err.message : String(err);
+  }
+}
 
-// Start loop
 animate();
 </script>
 </body>
