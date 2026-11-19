@@ -2,22 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Tim Hortons — Arcade Bakery & Beverage Rush</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#c8102e" />
+<title>Tim Hortons Beverage Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
     --tim-red: #c8102e;
-    --tim-dark: #1f2937;
-    --tim-gold: #f59e0b;
+    --tim-red-dark: #8e0c22;
+    --tim-brown: #6f3b22;
+    --tim-ink: #4a2818;
+    --tim-gold: #f5b942;
+    --tim-cream: #fff6ea;
+    --font: "Fredoka", "Trebuchet MS", "Segoe UI Rounded", "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; }
   body {
-    background: #f9f5f0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #ffe7c2;
+    font-family: var(--font);
+    color: var(--tim-ink);
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     position: relative;
+    touch-action: none;
   }
 
   #canvas-container {
@@ -27,178 +39,346 @@
     top: 0; left: 0;
     z-index: 1;
   }
+  #flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(200, 16, 46, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 12;
+  }
+  #flash.on { animation: mistakeFlash 0.42s ease; }
+  @keyframes mistakeFlash { 0% { opacity: 0.72; } 100% { opacity: 0; } }
+  #canvas-container.shake { animation: screenShake 0.38s linear; }
+  @keyframes screenShake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-5px, 2px); }
+    40% { transform: translate(5px, -2px); }
+    60% { transform: translate(-3px, -2px); }
+    80% { transform: translate(3px, 2px); }
+  }
 
-  /* HUD Overlay */
   .hud-top {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    z-index: 10;
-    pointer-events: none;
-  }
-  .hud-badge {
-    background: rgba(17, 24, 39, 0.85);
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 24px;
-    font-weight: 800;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    backdrop-filter: blur(4px);
-  }
-  .hud-brand {
-    background: var(--tim-red);
-    color: white;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    border: 2px solid #ef4444;
-  }
-
-  /* Current Active Order Ticket */
-  .active-ticket {
-    position: absolute;
-    top: 64px;
-    left: 12px;
-    background: #fffdf5;
-    border-top: 6px solid var(--tim-red);
-    border-radius: 8px;
-    padding: 12px 14px;
-    width: 250px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-    z-index: 10;
-    pointer-events: none;
-    transition: transform 0.2s;
-  }
-  .ticket-label { font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; }
-  .ticket-name { font-size: 16px; font-weight: 900; color: #111827; margin: 2px 0 4px; }
-  .ticket-steps { font-size: 11px; color: #4b5563; line-height: 1.4; }
-  .patience-bar {
-    width: 100%;
-    height: 6px;
-    background: #e5e7eb;
-    border-radius: 3px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .patience-fill {
-    width: 100%;
-    height: 100%;
-    background: #10b981;
-    transition: width 0.1s linear, background-color 0.3s;
-  }
-
-  /* Bottom Controls & Action Prompts */
-  .hud-bottom {
-    position: absolute;
-    bottom: 20px;
-    left: 0; right: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     z-index: 10;
     pointer-events: none;
   }
-  .interaction-prompt {
-    background: rgba(17, 24, 39, 0.9);
-    border: 2px solid var(--tim-gold);
-    color: white;
-    padding: 8px 20px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 800;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    display: none;
-    animation: pulse 1s infinite alternate;
+  .brand-lockup { display: flex; align-items: center; gap: 8px; }
+  .hud-badge, .hud-brand, .icon-btn, .use-btn, .active-ticket, .held-item-card, .interaction-prompt {
+    font-family: var(--font);
   }
-  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
-
-  .held-item-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-    font-size: 13px;
-    font-weight: 800;
-    color: #1f2937;
-  }
-  .held-tag {
-    background: #f3f4f6;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    color: #4b5563;
-  }
-
-  /* Toast Notification */
-  .toast-alert {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ef4444;
-    color: white;
-    padding: 10px 24px;
-    border-radius: 24px;
-    font-weight: 800;
-    font-size: 14px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    z-index: 20;
-    display: none;
-    text-align: center;
-    max-width: 90%;
-  }
-  .toast-alert.success { background: #10b981; }
-
-  /* Virtual Joystick for Mobile Touch */
-  .joystick-zone {
-    position: absolute;
-    bottom: 24px;
-    left: 24px;
-    width: 110px;
-    height: 110px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    z-index: 10;
+  .hud-badge {
+    background: linear-gradient(#fffdf9, #fff1d6);
+    border: 3px solid #fff;
+    color: var(--tim-ink);
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 15px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 0 #e7c08a, 0 8px 14px rgba(90, 40, 10, 0.12);
+    min-height: 42px;
   }
-  .joystick-knob {
-    width: 44px;
-    height: 44px;
-    background: white;
+  .hud-badge b { font-weight: 700; }
+  .stat-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .hud-brand {
+    background: linear-gradient(#e31b3c, var(--tim-red));
+    color: white;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 16px;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 0 var(--tim-red-dark);
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+  }
+  .icon-btn, .use-btn {
+    pointer-events: auto;
+    border: 3px solid #fff;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .icon-btn {
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    position: absolute;
+    background: linear-gradient(#fffdf9, #ffe7bf);
+    box-shadow: 0 4px 0 #e7c08a;
+    font-size: 20px;
   }
-  .controls-help {
+  .icon-btn:active, .use-btn:active { transform: translateY(3px); }
+
+  .active-ticket {
     position: absolute;
-    bottom: 12px;
-    right: 14px;
-    background: rgba(17, 24, 39, 0.7);
-    color: #9ca3af;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
+    top: 78px;
+    left: calc(12px + env(safe-area-inset-left));
+    background: linear-gradient(#fffdfb, #fff3df);
+    border: 4px solid #fff;
+    border-radius: 26px;
+    padding: 12px 14px 12px;
+    width: min(320px, calc(100vw - 24px));
+    box-shadow: 0 6px 0 #e8b56a, 0 14px 24px rgba(90, 40, 10, 0.16);
     z-index: 10;
     pointer-events: none;
+  }
+  .active-ticket.pop { animation: ticketPop 0.45s ease; }
+  @keyframes ticketPop {
+    0% { transform: scale(0.92); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .ticket-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tim-red);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .ticket-name { font-size: 22px; font-weight: 700; color: var(--tim-ink); margin: 2px 0 6px; line-height: 1.15; }
+  .ticket-steps { font-size: 14px; color: #6a4632; line-height: 1.45; font-weight: 500; }
+  .patience-bar {
+    width: 100%;
+    height: 12px;
+    background: #f3ddc0;
+    border-radius: 999px;
+    margin-top: 10px;
+    overflow: hidden;
+    border: 2px solid #fff;
+  }
+  .patience-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #7ddea8, #2fbe73);
+    border-radius: 999px;
+    transition: width 0.1s linear, background-color 0.3s;
+  }
+
+  .hud-bottom {
+    position: absolute;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 140px;
+    right: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .prompt-row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+  .step-ring { width: 46px; height: 46px; flex: 0 0 auto; filter: drop-shadow(0 3px 0 rgba(111, 59, 34, 0.18)); }
+  .ring-track { fill: none; stroke: #fff; stroke-width: 5; }
+  .ring-value {
+    fill: none;
+    stroke: var(--tim-red);
+    stroke-width: 5;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 20px 20px;
+    stroke-dasharray: 100.5;
+    stroke-dashoffset: 100.5;
+  }
+  .interaction-prompt {
+    background: linear-gradient(#fffdf9, #fff0d0);
+    border: 3px solid #fff;
+    color: var(--tim-ink);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 4px 0 #e7c08a;
+    display: none;
+    animation: pulse 1s infinite alternate;
+    text-align: center;
+  }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+  .held-item-card {
+    background: linear-gradient(#fffdfb, #fff1d8);
+    border: 3px solid #fff;
+    border-radius: 20px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 0 #e7c08a;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tim-ink);
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .held-tag {
+    background: #ffe1ea;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--tim-red-dark);
+    font-weight: 700;
+  }
+
+  .toast-alert {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--tim-red);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 22px;
+    border: 3px solid #fff;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 5px 0 var(--tim-red-dark);
+    z-index: 20;
+    display: none;
+    text-align: center;
+    max-width: min(520px, 92vw);
+    line-height: 1.3;
+  }
+  .toast-alert.success { background: #1faa62; box-shadow: 0 5px 0 #127a43; }
+
+  .joystick-zone {
+    position: absolute;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: calc(14px + env(safe-area-inset-left));
+    width: 118px;
+    height: 118px;
+    background: rgba(255, 250, 244, 0.86);
+    border: 4px solid rgba(200, 16, 46, 0.72);
+    border-radius: 50%;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 0 rgba(111, 59, 34, 0.16), inset 0 0 0 10px rgba(255, 228, 196, 0.95);
+    touch-action: none;
+  }
+  .joystick-knob {
+    width: 52px;
+    height: 52px;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #ffd98a);
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 0 #e0b15f;
+    position: absolute;
+  }
+  .use-btn {
+    position: absolute;
+    right: calc(14px + env(safe-area-inset-right));
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #ff617c, #c8102e 62%, #9d0d24);
+    color: white;
+    font-size: 18px;
+    letter-spacing: 0.4px;
+    box-shadow: 0 6px 0 #7d1024;
+    z-index: 11;
+  }
+  .controls-help {
+    position: static;
+    margin-top: 8px;
+    background: transparent;
+    color: #8a5a40;
+    padding: 0;
+    border: 0;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    transform: none;
+  }
+  .combo-pop {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font);
+    font-size: 48px;
+    font-weight: 700;
+    color: #fff8ea;
+    -webkit-text-stroke: 8px var(--tim-red);
+    paint-order: stroke fill;
+    text-shadow: 0 6px 0 #8e0c22;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 30;
+    white-space: nowrap;
+  }
+  .combo-pop.go { animation: comboPop 0.95s ease; }
+  @keyframes comboPop {
+    0% { opacity: 0; transform: translate(-50%, -30%) scale(0.55); }
+    22% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    70% { opacity: 1; transform: translate(-50%, -58%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -78%) scale(0.92); }
+  }
+  .float-pts {
+    position: absolute;
+    z-index: 28;
+    pointer-events: none;
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: 28px;
+    color: #fff;
+    -webkit-text-stroke: 5px #e39b14;
+    paint-order: stroke fill;
+    animation: floatUp 0.95s ease forwards;
+  }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
+    20% { opacity: 1; transform: translate(-50%, -8px) scale(1.08); }
+    100% { opacity: 0; transform: translate(-50%, -72px) scale(1); }
+  }
+  .spark {
+    position: absolute;
+    z-index: 27;
+    pointer-events: none;
+    font-size: 22px;
+    animation: sparkFly 0.8s ease-out forwards;
+  }
+  @keyframes sparkFly {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1); }
+  }
+
+  @media (max-width: 860px), (max-aspect-ratio: 4/5) {
+    .hud-top { flex-direction: column; align-items: stretch; gap: 8px; }
+    .brand-lockup { justify-content: space-between; }
+    .stat-row { justify-content: stretch; }
+    .stat-row .hud-badge { flex: 1; min-width: 0; padding: 6px 6px; font-size: 14px; }
+    .active-ticket {
+      top: auto;
+      bottom: calc(120px + env(safe-area-inset-bottom));
+      left: 10px;
+      right: 10px;
+      width: auto;
+    }
+    .ticket-name { font-size: 18px; }
+    .ticket-steps { font-size: 13px; }
+    .hud-bottom {
+      left: 12px;
+      right: 12px;
+      bottom: calc(340px + env(safe-area-inset-bottom));
+    }
+    .toast-alert { top: calc(118px + env(safe-area-inset-top)); }
+    .use-btn { width: 78px; height: 78px; }
+    .joystick-zone { width: 108px; height: 108px; }
+    .combo-pop { font-size: 36px; -webkit-text-stroke-width: 6px; }
   }
 </style>
 <script src="three.min.js"></script>
@@ -206,47 +386,55 @@
 <body>
 
 <div id="canvas-container"></div>
+<div id="flash"></div>
 
-<!-- HUD Top -->
 <div class="hud-top">
-  <div class="hud-brand">☕ TIM HORTONS 3D</div>
-  <div style="display:flex; gap:10px;">
-    <div class="hud-badge">⭐ Score: <span id="scoreVal" style="color:var(--tim-gold);">0</span></div>
-    <div class="hud-badge">💵 Revenue: $<span id="revenueVal">0</span></div>
+  <div class="brand-lockup">
+    <div class="hud-brand">☕ Tim Hortons</div>
+    <button type="button" id="muteBtn" class="icon-btn" aria-label="Mute sounds" aria-pressed="false">🔊</button>
+  </div>
+  <div class="stat-row">
+    <div class="hud-badge" title="Score">⭐ <b id="scoreVal">0</b></div>
+    <div class="hud-badge" title="Streak">🔥 <b id="streakVal">0</b></div>
+    <div class="hud-badge" title="Order timer">⏱ <b id="timerVal">0:35</b></div>
+    <div class="hud-badge" title="Revenue">💵 $<b id="revenueVal">0</b></div>
   </div>
 </div>
 
-<!-- Active Customer Ticket -->
 <div class="active-ticket" id="ticketCard">
-  <div class="ticket-label">Customer Order #<span id="ticketId">1</span></div>
+  <div class="ticket-label">Order #<span id="ticketId">1</span></div>
   <div class="ticket-name" id="ticketTitle">Medium Iced Capp</div>
   <div class="ticket-steps" id="ticketSteps">1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle</div>
   <div class="patience-bar">
     <div class="patience-fill" id="patienceFill"></div>
   </div>
+  <div class="controls-help">
+    Stick, WASD, or a tap on the floor to walk. Stand in a ring, or press USE, to work the station.
+  </div>
 </div>
 
-<!-- Center Alert Banner -->
 <div class="toast-alert" id="toastAlert">Wrong sequence! Check build card.</div>
+<div class="combo-pop" id="comboPop"></div>
 
-<!-- Bottom Prompt / Item Tracker -->
 <div class="hud-bottom">
-  <div class="interaction-prompt" id="promptText">PRESS SPACE OR STAND TO INTERACT</div>
+  <div class="prompt-row">
+    <svg id="stepRingWrap" class="step-ring" viewBox="0 0 40 40" style="display:none" aria-hidden="true">
+      <circle class="ring-track" cx="20" cy="20" r="16"></circle>
+      <circle id="stepRing" class="ring-value" cx="20" cy="20" r="16"></circle>
+    </svg>
+    <div class="interaction-prompt" id="promptText">WALK TO A GLOWING RING</div>
+  </div>
   <div class="held-item-card" id="heldCard" style="display:none;">
-    <span>Holding:</span>
+    <span>Holding</span>
     <span id="heldItemTitle" style="color:var(--tim-red);">Empty Hands</span>
     <span class="held-tag" id="heldStatusTag">Stand near Cups</span>
   </div>
 </div>
 
-<!-- Mobile Touch Joystick -->
 <div class="joystick-zone" id="joystickZone">
   <div class="joystick-knob" id="joystickKnob"></div>
 </div>
-
-<div class="controls-help">
-  Controls: <strong>WASD / Arrow Keys</strong> to walk | <strong>Click floor</strong> to move
-</div>
+<button type="button" id="useBtn" class="use-btn">USE</button>
 
 <script>
 // --- Three.js Isometric Game Scene ---
@@ -566,12 +754,17 @@ let moveVector = { x: 0, z: 0 };
 const joystickZone = document.getElementById('joystickZone');
 const joystickKnob = document.getElementById('joystickKnob');
 
-joystickZone.addEventListener('touchstart', handleTouchStart);
-joystickZone.addEventListener('touchmove', handleTouchMove);
+joystickZone.addEventListener('touchstart', handleTouchStart, { passive: false });
+joystickZone.addEventListener('touchmove', handleTouchMove, { passive: false });
 joystickZone.addEventListener('touchend', handleTouchEnd);
 
-function handleTouchStart(e) { joystickActive = true; handleTouchMove(e); }
+function handleTouchStart(e) {
+  if (e.cancelable) e.preventDefault();
+  joystickActive = true;
+  handleTouchMove(e);
+}
 function handleTouchMove(e) {
+  if (e.cancelable) e.preventDefault();
   if (!joystickActive) return;
   const touch = e.touches[0];
   const rect = joystickZone.getBoundingClientRect();
@@ -597,7 +790,7 @@ const mouse = new THREE.Vector2();
 let targetPosition = null;
 
 window.addEventListener('pointerdown', e => {
-  if (e.target.closest('#joystickZone') || e.target.closest('.hud-top')) return;
+  if (e.target.closest('#joystickZone, .hud-top, button, .use-btn, .icon-btn')) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
@@ -636,6 +829,11 @@ function nextTicket() {
 function updateTicketDisplay() {
   document.getElementById('ticketTitle').textContent = currentTicket.name;
   document.getElementById('ticketSteps').textContent = currentTicket.spec;
+  const timerEl = document.getElementById('timerVal');
+  if (timerEl) {
+    const secs = Math.max(0, Math.round(ticketTimer));
+    timerEl.textContent = '0:' + String(secs).padStart(2, '0');
+  }
 }
 
 function updateHeldDisplay() {
@@ -872,6 +1070,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Show the drink that was actually drawn. The 35s timer stays put; this only prints it.
+updateTicketDisplay();
 
 // Start loop
 animate();
