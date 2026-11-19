@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Tim Hortons — Arcade Bakery & Beverage Rush</title>
+<style>
+  :root {
+    --tim-red: #c8102e;
+    --tim-dark: #1f2937;
+    --tim-gold: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  body {
+    background: #f9f5f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #canvas-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 1;
+  }
+
+  /* HUD Overlay */
+  .hud-top {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .hud-badge {
+    background: rgba(17, 24, 39, 0.85);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 24px;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+  }
+  .hud-brand {
+    background: var(--tim-red);
+    color: white;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    border: 2px solid #ef4444;
+  }
+
+  /* Current Active Order Ticket */
+  .active-ticket {
+    position: absolute;
+    top: 64px;
+    left: 12px;
+    background: #fffdf5;
+    border-top: 6px solid var(--tim-red);
+    border-radius: 8px;
+    padding: 12px 14px;
+    width: 250px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    z-index: 10;
+    pointer-events: none;
+    transition: transform 0.2s;
+  }
+  .ticket-label { font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; }
+  .ticket-name { font-size: 16px; font-weight: 900; color: #111827; margin: 2px 0 4px; }
+  .ticket-steps { font-size: 11px; color: #4b5563; line-height: 1.4; }
+  .patience-bar {
+    width: 100%;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .patience-fill {
+    width: 100%;
+    height: 100%;
+    background: #10b981;
+    transition: width 0.1s linear, background-color 0.3s;
+  }
+
+  /* Bottom Controls & Action Prompts */
+  .hud-bottom {
+    position: absolute;
+    bottom: 20px;
+    left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .interaction-prompt {
+    background: rgba(17, 24, 39, 0.9);
+    border: 2px solid var(--tim-gold);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 800;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    display: none;
+    animation: pulse 1s infinite alternate;
+  }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+
+  .held-item-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    font-size: 13px;
+    font-weight: 800;
+    color: #1f2937;
+  }
+  .held-tag {
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #4b5563;
+  }
+
+  /* Toast Notification */
+  .toast-alert {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ef4444;
+    color: white;
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-weight: 800;
+    font-size: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    z-index: 20;
+    display: none;
+    text-align: center;
+    max-width: 90%;
+  }
+  .toast-alert.success { background: #10b981; }
+
+  /* Virtual Joystick for Mobile Touch */
+  .joystick-zone {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    width: 110px;
+    height: 110px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .joystick-knob {
+    width: 44px;
+    height: 44px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    position: absolute;
+  }
+  .controls-help {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    background: rgba(17, 24, 39, 0.7);
+    color: #9ca3af;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 10;
+    pointer-events: none;
+  }
+</style>
+<script src="three.min.js"></script>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- HUD Top -->
+<div class="hud-top">
+  <div class="hud-brand">☕ TIM HORTONS 3D</div>
+  <div style="display:flex; gap:10px;">
+    <div class="hud-badge">⭐ Score: <span id="scoreVal" style="color:var(--tim-gold);">0</span></div>
+    <div class="hud-badge">💵 Revenue: $<span id="revenueVal">0</span></div>
+  </div>
+</div>
+
+<!-- Active Customer Ticket -->
+<div class="active-ticket" id="ticketCard">
+  <div class="ticket-label">Customer Order #<span id="ticketId">1</span></div>
+  <div class="ticket-name" id="ticketTitle">Medium Iced Capp</div>
+  <div class="ticket-steps" id="ticketSteps">1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle</div>
+  <div class="patience-bar">
+    <div class="patience-fill" id="patienceFill"></div>
+  </div>
+</div>
+
+<!-- Center Alert Banner -->
+<div class="toast-alert" id="toastAlert">Wrong sequence! Check build card.</div>
+
+<!-- Bottom Prompt / Item Tracker -->
+<div class="hud-bottom">
+  <div class="interaction-prompt" id="promptText">PRESS SPACE OR STAND TO INTERACT</div>
+  <div class="held-item-card" id="heldCard" style="display:none;">
+    <span>Holding:</span>
+    <span id="heldItemTitle" style="color:var(--tim-red);">Empty Hands</span>
+    <span class="held-tag" id="heldStatusTag">Stand near Cups</span>
+  </div>
+</div>
+
+<!-- Mobile Touch Joystick -->
+<div class="joystick-zone" id="joystickZone">
+  <div class="joystick-knob" id="joystickKnob"></div>
+</div>
+
+<div class="controls-help">
+  Controls: <strong>WASD / Arrow Keys</strong> to walk | <strong>Click floor</strong> to move
+</div>
+
+<script>
+// --- Three.js Isometric Game Scene ---
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf9f5f0); // Warm cafe color
+
+// Isometric Camera
+const aspect = window.innerWidth / window.innerHeight;
+const d = 14;
+const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+camera.position.set(20, 24, 20);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.8); // Warm cafe lighting
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffdbac, 0.9); // Golden cafe light
+dirLight.position.set(15, 30, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 5;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -18;
+dirLight.shadow.camera.right = 18;
+dirLight.shadow.camera.top = 18;
+dirLight.shadow.camera.bottom = -18;
+scene.add(dirLight);
+
+// Restaurant Floor (Checkerboard pattern)
+const floorGeo = new THREE.PlaneGeometry(28, 22);
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = 256; floorCanvas.height = 256;
+const ctx = floorCanvas.getContext('2d');
+ctx.fillStyle = '#d4a574'; ctx.fillRect(0, 0, 256, 256); // Warm tan
+ctx.fillStyle = '#c9945c'; // Darker tan
+for(let i=0; i<4; i++){
+  for(let j=0; j<4; j++){
+    if((i+j)%2===0) ctx.fillRect(i*64, j*64, 64, 64);
+  }
+}
+const floorTex = new THREE.CanvasTexture(floorCanvas);
+floorTex.repeat.set(7, 5.5);
+floorTex.wrapS = THREE.RepeatWrapping;
+floorTex.wrapT = THREE.RepeatWrapping;
+const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 });
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Back & Side Walls with Tim Hortons Branding Red Stripe
+const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5e6d3, roughness: 0.85 }); // Cream walls
+const stripeMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.5 });
+
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6, 0.6), wallMat);
+backWall.position.set(0, 3, -11);
+scene.add(backWall);
+
+const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 0.7), stripeMat);
+backStripe.position.set(0, 4.5, -11);
+scene.add(backStripe);
+
+const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 22), wallMat);
+leftWall.position.set(-14, 3, 0);
+scene.add(leftWall);
+
+// --- Stations Definition ---
+const stations = [
+  { id: 'cups', name: 'Cup Dispenser', color: 0xef4444, pos: [-9, 0, -8], action: 'Take Cup' },
+  { id: 'dairy', name: 'Dairy Fridge', color: 0xffffff, pos: [-4, 0, -8], action: 'Add Cream (Line 1)' },
+  { id: 'syrups', name: 'Syrup Pumps', color: 0x78350f, pos: [1, 0, -8], action: 'Add Chocolate Syrup' },
+  { id: 'lids', name: 'Dome Lid Dispenser', color: 0x93c5fd, pos: [6, 0, -8], action: 'Snap on Dome Lid' },
+  { id: 'javamix', name: 'Java Mix Machine', color: 0x92400e, pos: [10, 0, -5], action: 'Fill Java Mix (Line 4)' },
+  { id: 'blender', name: 'Whipper Spindle', color: 0xf59e0b, pos: [10, 0, 1], action: 'Whip 15s' },
+  { id: 'sanitize', name: 'Sanitizer Rinse Cup', color: 0x06b6d4, pos: [10, 0, 6], action: 'Sanitize Spindle' },
+  { id: 'counter', name: 'Order Counter & Guest', color: 0x10b981, pos: [-2, 0, 7], action: 'Serve to Guest' },
+  { id: 'trash', name: 'Trash Bin', color: 0x64748b, pos: [-11, 0, 7], action: 'Dump / Reset' }
+];
+
+// Build 3D Station Meshes with Interaction Circles
+const stationMeshes = [];
+stations.forEach(st => {
+  const group = new THREE.Group();
+  group.position.set(st.pos[0], 0, st.pos[2]);
+
+  // Physical Counter / Equipment Box
+  const counterGeo = new THREE.BoxGeometry(2.4, 1.8, 1.8);
+  const counterMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+  const counterMesh = new THREE.Mesh(counterGeo, counterMat);
+  counterMesh.position.y = 0.9;
+  counterMesh.castShadow = true;
+  counterMesh.receiveShadow = true;
+  group.add(counterMesh);
+
+  // Top Equipment Accent Piece
+  const topGeo = new THREE.BoxGeometry(1.6, 1.0, 1.2);
+  const topMat = new THREE.MeshStandardMaterial({ color: st.color, roughness: 0.3, metalness: 0.2 });
+  const topMesh = new THREE.Mesh(topGeo, topMat);
+  topMesh.position.y = 2.3;
+  topMesh.castShadow = true;
+  group.add(topMesh);
+
+  // Glowing Floor Interaction Circle
+  const ringGeo = new THREE.RingGeometry(1.6, 1.9, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.rotation.x = -Math.PI / 2;
+  ringMesh.position.y = 0.03;
+  group.add(ringMesh);
+
+  // Floating 3D Label
+  const canvasLabel = document.createElement('canvas');
+  canvasLabel.width = 256; canvasLabel.height = 64;
+  const lctx = canvasLabel.getContext('2d');
+  lctx.fillStyle = '#111827'; lctx.fillRect(0,0,256,64);
+  lctx.strokeStyle = '#ffffff'; lctx.lineWidth = 4; lctx.strokeRect(2,2,252,60);
+  lctx.fillStyle = '#ffffff'; lctx.font = 'bold 24px Arial'; lctx.textAlign = 'center';
+  lctx.fillText(st.name, 128, 42);
+  const labelTex = new THREE.CanvasTexture(canvasLabel);
+  const labelMat = new THREE.SpriteMaterial({ map: labelTex });
+  const labelSprite = new THREE.Sprite(labelMat);
+  labelSprite.position.set(0, 3.8, 0);
+  labelSprite.scale.set(3.2, 0.8, 1);
+  group.add(labelSprite);
+
+  scene.add(group);
+  st.mesh = group;
+  st.ring = ringMesh;
+});
+
+// --- Player Character (Tim Hortons Crew Member) ---
+const playerGroup = new THREE.Group();
+playerGroup.position.set(0, 0, 0);
+
+// Body (Red Tim Hortons Apron)
+const bodyGeo = new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16);
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.6 });
+const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+bodyMesh.position.y = 1.1;
+bodyMesh.castShadow = true;
+playerGroup.add(bodyMesh);
+
+// Head
+const headGeo = new THREE.SphereGeometry(0.45, 16, 16);
+const headMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
+const headMesh = new THREE.Mesh(headGeo, headMat);
+headMesh.position.y = 2.15;
+headMesh.castShadow = true;
+playerGroup.add(headMesh);
+
+// Cap
+const capGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.18, 16);
+const capMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.5 });
+const capMesh = new THREE.Mesh(capGeo, capMat);
+capMesh.position.y = 2.5;
+playerGroup.add(capMesh);
+
+// Eyes on the front of the head. Player faces local +Z, same as the held cup.
+const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.45 });
+const eyeHighlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const headCenter = new THREE.Vector3(0, 2.15, 0);
+
+function addEye(side) {
+  const outward = new THREE.Vector3(side * 0.2, 0.05, 0.4).normalize();
+  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.36));
+
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 16), eyeWhiteMat);
+  white.position.copy(center);
+  playerGroup.add(white);
+
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.078, 16, 16), pupilMat);
+  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.09));
+  playerGroup.add(pupil);
+
+  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.026, 16, 16), eyeHighlightMat);
+  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.125));
+  highlight.position.y += 0.04;
+  highlight.position.x += side * 0.02;
+  playerGroup.add(highlight);
+}
+addEye(-1);
+addEye(1);
+
+// Arms hang from the shoulders. Pivots swing while walking; they stay beside the cup.
+const armMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
+const ARM_REST_X = -0.38;
+
+function addArm(side) {
+  const pivot = new THREE.Group();
+  pivot.position.set(side * 0.58, 1.58, 0.08);
+  pivot.rotation.z = side * 0.28;
+  pivot.rotation.x = ARM_REST_X;
+
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.68, 8), armMat);
+  arm.position.y = -0.34;
+  arm.castShadow = true;
+  pivot.add(arm);
+
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 16), armMat);
+  hand.position.set(0, -0.86, 0.05);
+  hand.castShadow = true;
+  pivot.add(hand);
+
+  playerGroup.add(pivot);
+  return pivot;
+}
+const armPivotL = addArm(1);
+const armPivotR = addArm(-1);
+
+// Held Cup Object in Character's Hands
+const heldCupGroup = new THREE.Group();
+heldCupGroup.position.set(0, 1.4, 0.9);
+const cupMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.28, 0.22, 0.65, 12),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+);
+heldCupGroup.add(cupMesh);
+heldCupGroup.visible = false;
+playerGroup.add(heldCupGroup);
+
+scene.add(playerGroup);
+
+// --- Customer NPC Character ---
+const customerGroup = new THREE.Group();
+customerGroup.position.set(-2, 0, 9.5); // Waiting on other side of counter
+const cBody = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+cBody.position.y = 1.1; cBody.castShadow = true;
+customerGroup.add(cBody);
+const cHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshStandardMaterial({ color: 0xfcd34d }));
+cHead.position.y = 2.15; cHead.castShadow = true;
+customerGroup.add(cHead);
+
+// Speech Bubble over Customer
+const bubbleCanvas = document.createElement('canvas');
+bubbleCanvas.width = 256; bubbleCanvas.height = 128;
+const bctx = bubbleCanvas.getContext('2d');
+bctx.fillStyle = '#ffffff'; bctx.fillRect(0,0,256,128);
+bctx.strokeStyle = '#c8102e'; bctx.lineWidth = 6; bctx.strokeRect(4,4,248,120);
+bctx.fillStyle = '#111827'; bctx.font = 'bold 26px Arial'; bctx.textAlign = 'center';
+bctx.fillText('☕ Medium', 128, 50);
+bctx.fillText('Iced Capp', 128, 90);
+const bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
+const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex }));
+bubbleSprite.position.set(0, 3.6, 0);
+bubbleSprite.scale.set(3, 1.5, 1);
+customerGroup.add(bubbleSprite);
+
+scene.add(customerGroup);
+
+// --- Drink Menu (Build Cards) ---
+const drinkMenu = [
+  {
+    name: 'Medium Iced Capp',
+    size: 'Medium',
+    needsSyrup: false,
+    needsWhip: true,
+    needsSanitize: true,
+    spec: '1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle'
+  },
+  {
+    name: 'Small Iced Capp Light',
+    size: 'Small',
+    needsSyrup: false,
+    needsWhip: true,
+    needsSanitize: true,
+    spec: '1. Small Cup → 2. 2% Milk L1 → 3. Dome Lid → 4. Java Mix L3 → 5. Whip 15s → 6. Sanitize Spindle'
+  },
+  {
+    name: 'Large Mocha Iced Capp Supreme',
+    size: 'Large',
+    needsSyrup: true,
+    needsWhip: true,
+    needsSanitize: true,
+    spec: '1. Large Cup → 2. Cream L1 → 3. Chocolate Syrup → 4. Dome Lid → 5. Java Mix L4 → 6. Whip 15s → 7. Chocolate Drizzle → 8. Sanitize Spindle'
+  }
+];
+
+function getRandomDrink() {
+  return drinkMenu[Math.floor(Math.random() * drinkMenu.length)];
+}
+
+// --- Game State & Rules ---
+let score = 0;
+let revenue = 0;
+let ticketTimer = 35;
+let currentTicket = getRandomDrink();
+
+let heldItem = {
+  hasCup: false,
+  size: null,
+  dairy: null,
+  syrup: null,
+  lid: null,
+  javaMix: false,
+  whipped: false,
+  sanitized: false
+};
+
+// Movement Controls
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Touch / Joystick
+let joystickActive = false;
+let moveVector = { x: 0, z: 0 };
+const joystickZone = document.getElementById('joystickZone');
+const joystickKnob = document.getElementById('joystickKnob');
+
+joystickZone.addEventListener('touchstart', handleTouchStart);
+joystickZone.addEventListener('touchmove', handleTouchMove);
+joystickZone.addEventListener('touchend', handleTouchEnd);
+
+function handleTouchStart(e) { joystickActive = true; handleTouchMove(e); }
+function handleTouchMove(e) {
+  if (!joystickActive) return;
+  const touch = e.touches[0];
+  const rect = joystickZone.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = touch.clientX - centerX;
+  const dy = touch.clientY - centerY;
+  const dist = Math.min(45, Math.hypot(dx, dy));
+  const angle = Math.atan2(dy, dx);
+  joystickKnob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+  moveVector.x = Math.cos(angle);
+  moveVector.z = Math.sin(angle);
+}
+function handleTouchEnd() {
+  joystickActive = false;
+  joystickKnob.style.transform = 'translate(0px, 0px)';
+  moveVector.x = 0; moveVector.z = 0;
+}
+
+// Click to Walk (Raycaster)
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let targetPosition = null;
+
+window.addEventListener('pointerdown', e => {
+  if (e.target.closest('#joystickZone') || e.target.closest('.hud-top')) return;
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(floor);
+  if (intersects.length > 0) {
+    targetPosition = intersects[0].point;
+  }
+});
+
+function showAlert(text, success = false) {
+  const alert = document.getElementById('toastAlert');
+  alert.textContent = text;
+  alert.className = 'toast-alert' + (success ? ' success' : '');
+  alert.style.display = 'block';
+  setTimeout(() => { alert.style.display = 'none'; }, 2800);
+}
+
+function nextTicket() {
+  currentTicket = getRandomDrink();
+  heldItem = {
+    hasCup: false,
+    size: null,
+    dairy: null,
+    syrup: null,
+    lid: null,
+    javaMix: false,
+    whipped: false,
+    sanitized: false
+  };
+  ticketTimer = 35;
+  updateTicketDisplay();
+  updateHeldDisplay();
+  showAlert('🎫 New Order! ' + currentTicket.name, true);
+}
+
+function updateTicketDisplay() {
+  document.getElementById('ticketTitle').textContent = currentTicket.name;
+  document.getElementById('ticketSteps').textContent = currentTicket.spec;
+}
+
+function updateHeldDisplay() {
+  const card = document.getElementById('heldCard');
+  if (!heldItem.hasCup) {
+    card.style.display = 'none';
+    heldCupGroup.visible = false;
+    return;
+  }
+  card.style.display = 'flex';
+  heldCupGroup.visible = true;
+
+  let title = `${heldItem.size || ''} Cup`;
+  if (heldItem.dairy) title += ` + ${heldItem.dairy}`;
+  if (heldItem.syrup) title += ' + Choc Syrup';
+  if (heldItem.lid) title += ' + Dome Lid';
+  if (heldItem.javaMix) title += ' + Java Mix';
+  if (heldItem.whipped) title += ' (Whipped!)';
+
+  document.getElementById('heldItemTitle').textContent = title;
+  
+  // Next Recommended Step Hint
+  let nextHint = 'Go to Counter';
+  if (!heldItem.dairy) nextHint = 'Next: Go to Dairy Fridge';
+  else if (!heldItem.lid) nextHint = 'Next: Snap on Dome Lid';
+  else if (!heldItem.javaMix) nextHint = 'Next: Fill Java Mix';
+  else if (!heldItem.whipped) nextHint = 'Next: Go to Whipper Spindle';
+  else if (!heldItem.sanitized) nextHint = 'Next: Sanitize Spindle!';
+  document.getElementById('heldStatusTag').textContent = nextHint;
+}
+
+// Station Interaction Handlers
+function interactWithStation(st) {
+  if (st.id === 'cups') {
+    if (heldItem.hasCup) {
+      showAlert('You are already holding a cup!');
+      return;
+    }
+    heldItem.hasCup = true;
+    heldItem.size = 'Medium';
+    showAlert('Grabbed Medium Cup!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'dairy') {
+    if (!heldItem.hasCup) { showAlert('Grab a cup first!'); return; }
+    if (heldItem.javaMix) { showAlert('Build Card Rule: Dairy must be added to Line 1 BEFORE Java Mix!'); return; }
+    if (heldItem.dairy) { showAlert('Dairy already filled to Line 1!'); return; }
+    heldItem.dairy = 'Cream';
+    showAlert('Filled Cream to Line 1!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'syrups') {
+    if (!heldItem.hasCup || !heldItem.dairy) { showAlert('Add dairy first before syrups!'); return; }
+    heldItem.syrup = 'Chocolate';
+    showAlert('Added 3 pumps Chocolate Syrup!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'lids') {
+    if (!heldItem.hasCup) { showAlert('Pick up a cup first!'); return; }
+    if (heldItem.lid) { showAlert('Dome lid already snapped on!'); return; }
+    heldItem.lid = 'Dome';
+    showAlert('Snapped on Dome Lid!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'javamix') {
+    if (!heldItem.dairy) { showAlert('Rule: Dairy to Line 1 before Java Mix!'); return; }
+    if (!heldItem.lid) { showAlert('Safety Rule: DOME LID must be on cup before filling Java Mix!'); return; }
+    if (heldItem.javaMix) { showAlert('Java Mix already filled to Line 4!'); return; }
+    heldItem.javaMix = true;
+    showAlert('Dispensed Java Mix to Line 4!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'blender') {
+    if (!heldItem.javaMix) { showAlert('Fill Java Mix before whipping!'); return; }
+    if (heldItem.lid !== 'Dome') { showAlert('Safety Violation: Dome lid must be sealed before inserting in whipper!'); return; }
+    if (heldItem.whipped) { showAlert('Drink is already whipped!'); return; }
+    heldItem.whipped = true;
+    heldItem.sanitized = false; // Flag that spindle needs cleaning
+    showAlert('Whipped 15s on spindle! MUST sanitize spindle next!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'sanitize') {
+    if (!heldItem.whipped) { showAlert('Sanitize is done AFTER whipping!'); return; }
+    heldItem.sanitized = true;
+    showAlert('Whipper spindle sanitized in rinse cup!', true);
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'trash') {
+    heldItem = { hasCup: false, size: null, dairy: null, syrup: null, lid: null, javaMix: false, whipped: false, sanitized: false };
+    showAlert('Cup discarded. Start fresh!');
+    updateHeldDisplay();
+    return;
+  }
+
+  if (st.id === 'counter') {
+    if (!heldItem.hasCup) { showAlert('Take an order and make the drink!'); return; }
+    // Validation
+    const mistakes = [];
+    if (!heldItem.dairy) mistakes.push('Missing Dairy (Cream L1)');
+    if (!heldItem.lid) mistakes.push('Missing Dome Lid');
+    if (!heldItem.javaMix) mistakes.push('Missing Java Mix');
+    if (!heldItem.whipped) mistakes.push('Not whipped');
+    if (!heldItem.sanitized) mistakes.push('Did not sanitize spindle!');
+
+    if (mistakes.length > 0) {
+      showAlert('Build Card Violation: ' + mistakes[0]);
+      return;
+    }
+
+    // Success!
+    score += 150;
+    revenue += 4.29;
+    document.getElementById('scoreVal').textContent = score;
+    document.getElementById('revenueVal').textContent = revenue.toFixed(2);
+    showAlert('Perfect Build! Customer served! (+$150 pts)', true);
+
+    // Customer happy bounce animation
+    customerGroup.position.y = 0.8;
+    setTimeout(() => { customerGroup.position.y = 0; }, 300);
+
+    // Get NEXT randomized drink
+    setTimeout(() => { nextTicket(); }, 500);
+    return;
+  }
+}
+
+// Main Game Animation Loop
+let activeStation = null;
+let lastInteractionTime = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Keyboard / Vector Movement
+  let vx = 0, vz = 0;
+  if (keys['w'] || keys['arrowup']) vz -= 1;
+  if (keys['s'] || keys['arrowdown']) vz += 1;
+  if (keys['a'] || keys['arrowleft']) vx -= 1;
+  if (keys['d'] || keys['arrowright']) vx += 1;
+
+  if (joystickActive) {
+    vx = moveVector.x;
+    vz = moveVector.z;
+  }
+
+  // Click target movement
+  if (targetPosition) {
+    const dx = targetPosition.x - playerGroup.position.x;
+    const dz = targetPosition.z - playerGroup.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.3) {
+      vx = dx / dist;
+      vz = dz / dist;
+    } else {
+      targetPosition = null;
+    }
+  }
+
+  const speed = 0.18;
+  if (vx !== 0 || vz !== 0) {
+    playerGroup.position.x += vx * speed;
+    playerGroup.position.z += vz * speed;
+
+    // Bounds checking
+    playerGroup.position.x = Math.max(-12, Math.min(12, playerGroup.position.x));
+    playerGroup.position.z = Math.max(-9, Math.min(9, playerGroup.position.z));
+
+    // Rotate player to face movement direction
+    const angle = Math.atan2(vx, vz);
+    playerGroup.rotation.y = angle;
+
+    // Subtle run wobble
+    bodyMesh.position.y = 1.1 + Math.sin(Date.now() * 0.015) * 0.05;
+  }
+
+  // Visual-only arm swing. Does not change position, facing, or speed.
+  const walking = vx !== 0 || vz !== 0;
+  const swing = walking ? Math.sin(Date.now() * 0.012) * 0.4 : 0;
+  armPivotL.rotation.x = ARM_REST_X + swing;
+  armPivotR.rotation.x = ARM_REST_X - swing;
+
+  // Station Proximity & Interaction Zone Detection
+  let nearbyStation = null;
+  stations.forEach(st => {
+    const dist = Math.hypot(playerGroup.position.x - st.pos[0], playerGroup.position.z - st.pos[2]);
+    if (dist < 2.4) {
+      nearbyStation = st;
+      st.ring.material.opacity = 1.0;
+      st.ring.scale.set(1.15, 1.15, 1);
+    } else {
+      st.ring.material.opacity = 0.4;
+      st.ring.scale.set(1, 1, 1);
+    }
+  });
+
+  const promptElem = document.getElementById('promptText');
+  if (nearbyStation) {
+    promptElem.textContent = `STAND HERE TO: ${nearbyStation.action.toUpperCase()}`;
+    promptElem.style.display = 'block';
+
+    // Auto-trigger when standing still in circle
+    if (Date.now() - lastInteractionTime > 1100) {
+      interactWithStation(nearbyStation);
+      lastInteractionTime = Date.now();
+    }
+  } else {
+    promptElem.style.display = 'none';
+  }
+
+  renderer.render(scene, camera);
+}
+
+// Window Resize
+window.addEventListener('resize', () => {
+  const aspect = window.innerWidth / window.innerHeight;
+  camera.left = -d * aspect;
+  camera.right = d * aspect;
+  camera.top = d;
+  camera.bottom = -d;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start loop
+animate();
+</script>
+</body>
+</html>
