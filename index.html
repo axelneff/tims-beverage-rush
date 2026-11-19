@@ -440,75 +440,172 @@
 // --- Three.js Isometric Game Scene ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf9f5f0); // Warm cafe color
+scene.background = new THREE.Color(0xfff1dc);
 
-// Isometric Camera
+// Isometric Camera. viewSize is updated for portrait in the resize handler.
 const aspect = window.innerWidth / window.innerHeight;
-const d = 14;
-const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+let viewSize = 14;
+const camera = new THREE.OrthographicCamera(-viewSize * aspect, viewSize * aspect, viewSize, -viewSize, 1, 1000);
 camera.position.set(20, 24, 20);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.8); // Warm cafe lighting
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(0xffdbac, 0.9); // Golden cafe light
-dirLight.position.set(15, 30, 10);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-dirLight.shadow.camera.near = 5;
-dirLight.shadow.camera.far = 60;
-dirLight.shadow.camera.left = -18;
-dirLight.shadow.camera.right = 18;
-dirLight.shadow.camera.top = 18;
-dirLight.shadow.camera.bottom = -18;
-scene.add(dirLight);
-
-// Restaurant Floor (Checkerboard pattern)
-const floorGeo = new THREE.PlaneGeometry(28, 22);
-const floorCanvas = document.createElement('canvas');
-floorCanvas.width = 256; floorCanvas.height = 256;
-const ctx = floorCanvas.getContext('2d');
-ctx.fillStyle = '#d4a574'; ctx.fillRect(0, 0, 256, 256); // Warm tan
-ctx.fillStyle = '#c9945c'; // Darker tan
-for(let i=0; i<4; i++){
-  for(let j=0; j<4; j++){
-    if((i+j)%2===0) ctx.fillRect(i*64, j*64, 64, 64);
-  }
+function lit(color) {
+  return new THREE.MeshLambertMaterial({ color: color });
 }
+
+// Soft bakery light: warm sky, wood-colored bounce, one shadow-casting sun.
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0xf0c48a, 0.62));
+scene.add(new THREE.AmbientLight(0xfff4e6, 0.38));
+const dirLight = new THREE.DirectionalLight(0xfff7ec, 0.78);
+dirLight.position.set(12, 22, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 1024;
+dirLight.shadow.mapSize.height = 1024;
+dirLight.shadow.bias = -0.0012;
+dirLight.shadow.camera.near = 4;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -22;
+dirLight.shadow.camera.right = 22;
+dirLight.shadow.camera.top = 22;
+dirLight.shadow.camera.bottom = -22;
+scene.add(dirLight);
+scene.add(dirLight.target);
+
+function canvasRoundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+// Warm square tiles with soft grout. One tile, repeated.
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = 128;
+floorCanvas.height = 128;
+const fctx = floorCanvas.getContext('2d');
+fctx.fillStyle = '#e7b56a';
+fctx.fillRect(0, 0, 128, 128);
+fctx.fillStyle = '#ffc56d';
+canvasRoundRect(fctx, 8, 8, 112, 112, 16);
+fctx.fill();
+fctx.fillStyle = '#ffd892';
+canvasRoundRect(fctx, 18, 18, 52, 52, 12);
+fctx.fill();
 const floorTex = new THREE.CanvasTexture(floorCanvas);
-floorTex.repeat.set(7, 5.5);
+floorTex.repeat.set(10, 8);
 floorTex.wrapS = THREE.RepeatWrapping;
 floorTex.wrapT = THREE.RepeatWrapping;
-const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 });
-const floor = new THREE.Mesh(floorGeo, floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 22), new THREE.MeshLambertMaterial({ map: floorTex }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Back & Side Walls with Tim Hortons Branding Red Stripe
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5e6d3, roughness: 0.85 }); // Cream walls
-const stripeMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.5 });
+const rug = new THREE.Mesh(new THREE.CircleGeometry(2.7, 24), lit(0xf0b15a));
+rug.rotation.x = -Math.PI / 2;
+rug.position.set(0, 0.015, 0.2);
+rug.receiveShadow = true;
+scene.add(rug);
 
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6, 0.6), wallMat);
-backWall.position.set(0, 3, -11);
+// Cream walls, wood wainscot, Tims red stripe.
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6.5, 0.42), lit(0xfff6ea));
+backWall.position.set(0, 3.25, -11);
+backWall.receiveShadow = true;
 scene.add(backWall);
-
-const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 0.7), stripeMat);
-backStripe.position.set(0, 4.5, -11);
+const backWood = new THREE.Mesh(new THREE.BoxGeometry(28, 1.65, 0.56), lit(0xe39a45));
+backWood.position.set(0, 0.82, -10.95);
+backWood.receiveShadow = true;
+scene.add(backWood);
+const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.46, 0.64), lit(0xc8102e));
+backStripe.position.set(0, 4.85, -10.9);
 scene.add(backStripe);
 
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 22), wallMat);
-leftWall.position.set(-14, 3, 0);
+const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.42, 6.5, 22), lit(0xfff6ea));
+leftWall.position.set(-14, 3.25, 0);
+leftWall.receiveShadow = true;
 scene.add(leftWall);
+const leftWood = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.65, 22), lit(0xe39a45));
+leftWood.position.set(-13.95, 0.82, 0);
+scene.add(leftWood);
+
+const signCanvas = document.createElement('canvas');
+signCanvas.width = 768;
+signCanvas.height = 180;
+function paintSign() {
+  const c = signCanvas.getContext('2d');
+  c.clearRect(0, 0, 768, 180);
+  c.fillStyle = '#c8102e';
+  canvasRoundRect(c, 8, 8, 752, 164, 48);
+  c.fill();
+  c.fillStyle = '#fff8ee';
+  c.font = '700 72px Fredoka, Trebuchet MS, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('Tim Hortons', 384, 96);
+  if (signTex) signTex.needsUpdate = true;
+}
+let signTex = null;
+paintSign();
+signTex = new THREE.CanvasTexture(signCanvas);
+const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.5), new THREE.MeshBasicMaterial({ map: signTex }));
+sign.position.set(-1.2, 5.35, -10.68);
+scene.add(sign);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(paintSign);
+}
+
+const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(3.1, 2.15, 0.2), lit(0x7a4324));
+windowFrame.position.set(8.4, 3.55, -10.7);
+scene.add(windowFrame);
+const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.6), lit(0x8fd4ff));
+windowPane.position.set(8.4, 3.55, -10.55);
+scene.add(windowPane);
+const windowShine = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.15), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+windowShine.position.set(7.7, 3.7, -10.52);
+scene.add(windowShine);
+
+for (let i = 0; i < 8; i++) {
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 7), i % 2 === 0 ? lit(0xc8102e) : lit(0xfff6ea));
+  flag.position.set(-7 + i * 2, 5.45, -10.62);
+  flag.rotation.x = Math.PI;
+  scene.add(flag);
+}
+
+function addLamp(x, z) {
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), lit(0x7a4324));
+  cord.position.set(x, 5.7, z);
+  scene.add(cord);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), lit(0xfff3c4));
+  bulb.position.set(x, 5.15, z);
+  scene.add(bulb);
+}
+addLamp(-5.5, -6.2);
+addLamp(4.2, -5.4);
+
+function addPlant(x, z) {
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.46, 10), lit(0xc8102e));
+  pot.position.set(x, 0.23, z);
+  pot.castShadow = true;
+  scene.add(pot);
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 8), lit(0x3fae55));
+  leaf.position.set(x, 0.78, z);
+  leaf.castShadow = true;
+  scene.add(leaf);
+  const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lit(0x7ed37a));
+  sprout.position.set(x + 0.18, 1.05, z + 0.08);
+  scene.add(sprout);
+}
+addPlant(-12.3, -9.1);
+addPlant(12.3, -8.6);
 
 // --- Stations Definition ---
 const stations = [
@@ -1061,15 +1158,18 @@ function animate() {
 }
 
 // Window Resize
-window.addEventListener('resize', () => {
-  const aspect = window.innerWidth / window.innerHeight;
-  camera.left = -d * aspect;
-  camera.right = d * aspect;
-  camera.top = d;
-  camera.bottom = -d;
+function frameCamera() {
+  const aspectNow = window.innerWidth / window.innerHeight;
+  camera.left = -viewSize * aspectNow;
+  camera.right = viewSize * aspectNow;
+  camera.top = viewSize;
+  camera.bottom = -viewSize;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+}
+window.addEventListener('resize', frameCamera);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', frameCamera);
 
 // Show the drink that was actually drawn. The 35s timer stays put; this only prints it.
 updateTicketDisplay();
