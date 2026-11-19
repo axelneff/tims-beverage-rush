@@ -320,13 +320,13 @@
     z-index: 30;
     white-space: nowrap;
   }
-  .combo-pop.go { animation: comboPop 0.95s ease; }
-  @keyframes comboPop {
-    0% { opacity: 0; transform: translate(-50%, -30%) scale(0.55); }
-    22% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
-    70% { opacity: 1; transform: translate(-50%, -58%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -78%) scale(0.92); }
-  }
+.combo-pop.go { animation: comboPop 1.7s ease; }
+@keyframes comboPop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.55); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+  70% { opacity: 1; transform: translate(-50%, -56%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(0.94); }
+}
   .float-pts {
     position: absolute;
     z-index: 28;
@@ -808,18 +808,18 @@ const headCenter = new THREE.Vector3(0, 1.6, 0);
 
 function addEye(side) {
   const outward = new THREE.Vector3(side * 0.2, 0.05, 0.4).normalize();
-  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.5));
+  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.46));
 
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), eyeWhiteMat);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), eyeWhiteMat);
   white.position.copy(center);
   playerGroup.add(white);
 
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.086, 16, 16), pupilMat);
-  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.1));
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 16), pupilMat);
+  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.12));
   playerGroup.add(pupil);
 
-  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 12), eyeHighlightMat);
-  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.14));
+  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), eyeHighlightMat);
+  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.16));
   highlight.position.y += 0.045;
   highlight.position.x += side * 0.02;
   playerGroup.add(highlight);
@@ -1303,18 +1303,17 @@ function worldToScreen(x, y, z) {
   };
 }
 function floatPoints(text) {
-  const at = worldToScreen(customerGroup.position.x, 2.1, customerGroup.position.z);
   const el = document.createElement('div');
   el.className = 'float-pts';
   el.textContent = text;
-  el.style.left = at.x + 'px';
-  el.style.top = at.y + 'px';
+  el.style.left = (window.innerWidth * 0.56) + 'px';
+  el.style.top = (window.innerHeight * 0.5) + 'px';
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1000);
+  setTimeout(() => el.remove(), 1100);
 }
 function burstSparkles() {
-  const at = worldToScreen(customerGroup.position.x, 1.7, customerGroup.position.z);
-  for (let i = 0; i < 14; i++) {
+  const at = { x: window.innerWidth * 0.56, y: window.innerHeight * 0.46 };
+  for (let i = 0; i < 16; i++) {
     const el = document.createElement('div');
     el.className = 'spark';
     el.textContent = i % 2 === 0 ? '✦' : '●';
@@ -1506,8 +1505,8 @@ function animate() {
 
   if (playerSquash > 0) {
     const k = Math.sin(playerSquash * Math.PI);
-    playerGroup.scale.set(1 + k * 0.12, 1 - k * 0.16, 1 + k * 0.12);
-    playerSquash = Math.max(0, playerSquash - 0.08);
+    playerGroup.scale.set(1 + k * 0.16, 1 - k * 0.22, 1 + k * 0.16);
+    playerSquash = Math.max(0, playerSquash - 0.045);
   } else if (playerGroup.scale.x !== 1) {
     playerGroup.scale.set(1, 1, 1);
   }
@@ -1515,8 +1514,8 @@ function animate() {
     const j = stationSquash[st.id] || 0;
     if (j > 0) {
       const k = Math.sin(j * Math.PI);
-      st.mesh.scale.set(1 + k * 0.07, 1 - k * 0.1, 1 + k * 0.07);
-      stationSquash[st.id] = Math.max(0, j - 0.07);
+      st.mesh.scale.set(1 + k * 0.1, 1 - k * 0.16, 1 + k * 0.1);
+      stationSquash[st.id] = Math.max(0, j - 0.04);
     } else if (st.mesh.scale.x !== 1) {
       st.mesh.scale.set(1, 1, 1);
     }
