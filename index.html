@@ -21,7 +21,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
   html, body { width: 100%; height: 100%; }
   body {
-    background: #ffe7c2;
+    background: #d5d8dc;
     font-family: var(--font);
     color: var(--tim-ink);
     width: 100vw;
@@ -551,7 +551,7 @@
 // --- Three.js Isometric Game Scene ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xfff1dc);
+scene.background = new THREE.Color(0xdfe3e6);
 
 // Isometric Camera. viewSize is updated for portrait in the resize handler.
 const aspect = window.innerWidth / window.innerHeight;
@@ -571,21 +571,21 @@ function lit(color) {
   return new THREE.MeshLambertMaterial({ color: color });
 }
 
-// Soft bakery light: warm sky, wood-colored bounce, one shadow-casting sun.
-scene.add(new THREE.HemisphereLight(0xfff6e8, 0xf0c48a, 0.62));
-scene.add(new THREE.AmbientLight(0xfff4e6, 0.38));
-const dirLight = new THREE.DirectionalLight(0xfff7ec, 0.78);
-dirLight.position.set(12, 22, 10);
+// Store light: bright, slightly cool, like the real cafes.
+scene.add(new THREE.HemisphereLight(0xf7f8fa, 0xc5c8cc, 0.72));
+scene.add(new THREE.AmbientLight(0xf4f5f7, 0.42));
+const dirLight = new THREE.DirectionalLight(0xfff8f0, 0.72);
+dirLight.position.set(10, 24, 14);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 1024;
 dirLight.shadow.mapSize.height = 1024;
 dirLight.shadow.bias = -0.0012;
 dirLight.shadow.camera.near = 4;
-dirLight.shadow.camera.far = 60;
-dirLight.shadow.camera.left = -22;
-dirLight.shadow.camera.right = 22;
-dirLight.shadow.camera.top = 22;
-dirLight.shadow.camera.bottom = -22;
+dirLight.shadow.camera.far = 70;
+dirLight.shadow.camera.left = -28;
+dirLight.shadow.camera.right = 28;
+dirLight.shadow.camera.top = 28;
+dirLight.shadow.camera.bottom = -28;
 scene.add(dirLight);
 scene.add(dirLight.target);
 
@@ -599,54 +599,137 @@ function canvasRoundRect(c, x, y, w, h, r) {
   c.closePath();
 }
 
-// Warm square tiles with soft grout. One tile, repeated.
+// Light grey speckled floor, like the terrazzo in the stores.
 const floorCanvas = document.createElement('canvas');
 floorCanvas.width = 128;
 floorCanvas.height = 128;
 const fctx = floorCanvas.getContext('2d');
-fctx.fillStyle = '#e7b56a';
+fctx.fillStyle = '#a3a7a4';
 fctx.fillRect(0, 0, 128, 128);
-fctx.fillStyle = '#ffc56d';
-canvasRoundRect(fctx, 8, 8, 112, 112, 16);
-fctx.fill();
-fctx.fillStyle = '#ffd892';
-canvasRoundRect(fctx, 18, 18, 52, 52, 12);
-fctx.fill();
+for (let i = 0; i < 90; i++) {
+  const tone = i % 3 === 0 ? '#eceeed' : i % 3 === 1 ? '#9b9e9b' : '#b7bab6';
+  fctx.fillStyle = tone;
+  fctx.fillRect((i * 37) % 124, (i * 19) % 124, i % 5 === 0 ? 4 : 2, i % 4 === 0 ? 3 : 2);
+}
 const floorTex = new THREE.CanvasTexture(floorCanvas);
-floorTex.repeat.set(10, 8);
+floorTex.repeat.set(14, 10);
 floorTex.wrapS = THREE.RepeatWrapping;
 floorTex.wrapT = THREE.RepeatWrapping;
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 22), new THREE.MeshLambertMaterial({ map: floorTex }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 20), new THREE.MeshLambertMaterial({ map: floorTex }));
 floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0, -1.2);
 floor.receiveShadow = true;
 scene.add(floor);
 
-const rug = new THREE.Mesh(new THREE.CircleGeometry(2.7, 24), lit(0xf0b15a));
-rug.rotation.x = -Math.PI / 2;
-rug.position.set(0, 0.015, 0.2);
-rug.receiveShadow = true;
-scene.add(rug);
+const lane = new THREE.Mesh(new THREE.PlaneGeometry(8, 16), lit(0x9aa0a6));
+lane.rotation.x = -Math.PI / 2;
+lane.position.set(-19.2, 0.01, -2.4);
+lane.receiveShadow = true;
+scene.add(lane);
+const laneDash = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 10), lit(0xf4f1ea));
+laneDash.rotation.x = -Math.PI / 2;
+laneDash.position.set(-19.2, 0.02, -2.4);
+scene.add(laneDash);
 
-// Cream walls, wood wainscot, Tims red stripe.
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6.5, 0.42), lit(0xfff6ea));
-backWall.position.set(0, 3.25, -11);
+const blockers = [];
+function addBlock(x, z, w, d) {
+  blockers.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+}
+function blockedAt(x, z, radius) {
+  if (x < -14.7 || x > 14.7 || z < -7.95 || z > 0.18) return true;
+  const r = radius || 0.34;
+  return blockers.some((b) => x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ);
+}
+
+function addPart(parent, geo, material, x, y, z) {
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+const WOOD = 0xc4a06a;
+const WOOD_DARK = 0x8d6a43;
+const CHAR = 0x2a2c31;
+const STEEL = 0xd5d8dc;
+const TOP = 0.94;
+
+function counterRun(x, z, w, d, guestFace) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  addPart(g, new THREE.BoxGeometry(w, 0.78, d), lit(WOOD), 0, 0.46, 0);
+  addPart(g, new THREE.BoxGeometry(w, 0.1, d + 0.06), lit(0xf3f1ec), 0, 0.88, 0);
+  addPart(g, new THREE.BoxGeometry(w, 0.08, d + 0.02), lit(CHAR), 0, 0.08, 0);
+  if (guestFace) {
+    addPart(g, new THREE.BoxGeometry(w, 0.12, 0.08), lit(0xc8102e), 0, 0.62, d / 2 + 0.02);
+  }
+  addPart(g, new THREE.BoxGeometry(w - 0.2, 0.46, 0.06), lit(WOOD_DARK), 0, 0.42, (guestFace ? 1 : -1) * (d / 2 - 0.02));
+  scene.add(g);
+  addBlock(x, z, w, d);
+  return g;
+}
+
+// Front counter: guests on the near side, crew on the far side.
+counterRun(1.2, 1.2, 24.4, 1.5, true);
+// Centre beverage line.
+counterRun(-0.4, -3.9, 26.2, 1.5, false);
+// Back brewer line against the wall.
+counterRun(0.6, -7.15, 24, 1.35, false);
+
+// Walls: white, with subway tile behind the brewers.
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(32, 5.6, 0.28), lit(0xf7f8f9));
+backWall.position.set(0, 2.8, -8.35);
 backWall.receiveShadow = true;
 scene.add(backWall);
-const backWood = new THREE.Mesh(new THREE.BoxGeometry(28, 1.65, 0.56), lit(0xe39a45));
-backWood.position.set(0, 0.82, -10.95);
-backWood.receiveShadow = true;
-scene.add(backWood);
-const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.46, 0.64), lit(0xc8102e));
-backStripe.position.set(0, 4.85, -10.9);
-scene.add(backStripe);
+addBlock(0, -8.35, 32, 0.4);
+const tileCanvas = document.createElement('canvas');
+tileCanvas.width = 64;
+tileCanvas.height = 96;
+const tctx = tileCanvas.getContext('2d');
+tctx.fillStyle = '#b7bbb8';
+tctx.fillRect(0, 0, 64, 96);
+tctx.fillStyle = '#f4f5f4';
+for (let row = 0; row < 4; row++) {
+  const shift = row % 2 ? 16 : 0;
+  for (let col = -1; col < 3; col++) {
+    tctx.fillRect(shift + col * 32 + 2, row * 24 + 2, 28, 20);
+  }
+}
+const tileTex = new THREE.CanvasTexture(tileCanvas);
+tileTex.wrapS = THREE.RepeatWrapping;
+tileTex.wrapT = THREE.RepeatWrapping;
+tileTex.repeat.set(10, 1);
+const tile = new THREE.Mesh(new THREE.PlaneGeometry(26, 2.2), new THREE.MeshLambertMaterial({ map: tileTex }));
+tile.position.set(0.4, 2.15, -8.18);
+scene.add(tile);
 
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.42, 6.5, 22), lit(0xfff6ea));
-leftWall.position.set(-14, 3.25, 0);
-leftWall.receiveShadow = true;
+const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.28, 5.6, 16), lit(0xf4f5f6));
+leftWall.position.set(-15.15, 2.8, -1.6);
 scene.add(leftWall);
-const leftWood = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.65, 22), lit(0xe39a45));
-leftWood.position.set(-13.95, 0.82, 0);
-scene.add(leftWood);
+const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.28, 5.6, 16), lit(0xe7eaed));
+rightWall.position.set(15.15, 2.8, -1.6);
+scene.add(rightWall);
+
+// Drive-thru window in the wall nearest the Iced Capp end, plus a small hand-off table.
+const dtFrame = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.7, 2.4), lit(CHAR));
+dtFrame.position.set(-15.02, 1.7, -4.1);
+scene.add(dtFrame);
+const dtGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.25), new THREE.MeshBasicMaterial({ color: 0xb9d7ea, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+const dtSign = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.38), new THREE.MeshBasicMaterial({ color: 0xc8102e, side: THREE.DoubleSide }));
+dtSign.position.set(-14.95, 2.75, -4.1);
+dtSign.rotation.y = Math.PI / 2;
+scene.add(dtSign);
+dtGlass.position.set(-14.9, 1.75, -4.1);
+dtGlass.rotation.y = Math.PI / 2;
+scene.add(dtGlass);
+const dtTable = new THREE.Group();
+dtTable.position.set(-14.15, 0, -4.15);
+addPart(dtTable, new THREE.BoxGeometry(1.15, 0.72, 0.7), lit(WOOD), 0, 0.4, 0);
+addPart(dtTable, new THREE.BoxGeometry(1.25, 0.08, 0.8), lit(0xf3f1ec), 0, 0.78, 0);
+scene.add(dtTable);
+addBlock(-14.15, -4.15, 1.25, 0.85);
 
 const signCanvas = document.createElement('canvas');
 signCanvas.width = 768;
@@ -667,280 +750,296 @@ function paintSign() {
 let signTex = null;
 paintSign();
 signTex = new THREE.CanvasTexture(signCanvas);
-const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.5), new THREE.MeshBasicMaterial({ map: signTex }));
-sign.position.set(-1.2, 5.35, -10.68);
+const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 1.35), new THREE.MeshBasicMaterial({ map: signTex }));
+sign.position.set(1.2, 4.35, 1.15);
 scene.add(sign);
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(paintSign);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintSign);
+
+// Wood-slat ceiling accents over the crew aisle.
+for (let i = 0; i < 4; i++) {
+  const slat = new THREE.Mesh(new THREE.BoxGeometry(14, 0.06, 0.22), lit(i % 2 ? 0xb68958 : 0xc4a06a));
+  slat.position.set(-1, 5.7, -7.4 + i * 0.36);
+  scene.add(slat);
 }
 
-const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(3.1, 2.15, 0.2), lit(0x7a4324));
-windowFrame.position.set(8.4, 3.55, -10.7);
-scene.add(windowFrame);
-const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.6), lit(0x8fd4ff));
-windowPane.position.set(8.4, 3.55, -10.55);
-scene.add(windowPane);
-const windowShine = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.15), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
-windowShine.position.set(7.7, 3.7, -10.52);
-scene.add(windowShine);
-
-for (let i = 0; i < 8; i++) {
-  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 7), i % 2 === 0 ? lit(0xc8102e) : lit(0xfff6ea));
-  flag.position.set(-7 + i * 2, 5.45, -10.62);
-  flag.rotation.x = Math.PI;
-  scene.add(flag);
+function menuBoard(x, title, tint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 180;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#1e2126';
+  c.fillRect(0, 0, 320, 180);
+  c.fillStyle = '#c8102e';
+  c.fillRect(0, 0, 320, 44);
+  c.fillStyle = '#fff';
+  c.font = '700 28px Fredoka, Trebuchet MS, sans-serif';
+  c.textAlign = 'center';
+  c.fillText(title, 160, 32);
+  c.fillStyle = tint;
+  c.fillRect(24, 68, 70, 86);
+  c.fillStyle = '#f3f1ec';
+  c.fillRect(110, 68, 86, 86);
+  c.fillStyle = '#6b3a22';
+  c.fillRect(212, 68, 80, 86);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.4), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas) }));
+  mesh.position.set(x, 3.55, 0.35);
+  scene.add(mesh);
 }
+menuBoard(-4.2, 'Classics', '#6b3a22');
+menuBoard(1.4, 'Iced', '#2f6bff');
+menuBoard(6.8, 'Bakery', '#e39a45');
 
-function addLamp(x, z) {
-  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), lit(0x7a4324));
-  cord.position.set(x, 5.7, z);
-  scene.add(cord);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), lit(0xfff3c4));
-  bulb.position.set(x, 5.15, z);
-  scene.add(bulb);
-}
-addLamp(-5.5, -6.2);
-addLamp(4.2, -5.4);
+// Donut showcase on the guest side of the front counter.
+const caseGroup = new THREE.Group();
+caseGroup.position.set(-6.4, 0, 2.55);
+addPart(caseGroup, new THREE.BoxGeometry(3.4, 0.9, 1.15), lit(WOOD), 0, 0.5, 0);
+addPart(caseGroup, new THREE.BoxGeometry(3.2, 0.7, 0.08), new THREE.MeshLambertMaterial({ color: 0xd7e7f2, transparent: true, opacity: 0.45 }), 0, 1.15, 0.5);
+const donutColors = [0xc8102e, 0xf3d27a, 0x6b3a22, 0xe7a0b4, 0xf7f1e4, 0xc46a2f];
+donutColors.forEach((color, i) => {
+  const ring = addPart(caseGroup, new THREE.TorusGeometry(0.16, 0.07, 6, 10), lit(color), -1.2 + (i % 3) * 0.55, 0.85 + Math.floor(i / 3) * 0.28, 0.1);
+  ring.rotation.x = Math.PI / 2;
+});
+scene.add(caseGroup);
 
-function addPlant(x, z) {
-  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.46, 10), lit(0xc8102e));
-  pot.position.set(x, 0.23, z);
-  pot.castShadow = true;
-  scene.add(pot);
-  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 8), lit(0x3fae55));
-  leaf.position.set(x, 0.78, z);
-  leaf.castShadow = true;
-  scene.add(leaf);
-  const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lit(0x7ed37a));
-  sprout.position.set(x + 0.18, 1.05, z + 0.08);
-  scene.add(sprout);
-}
-addPlant(-12.3, -9.1);
-addPlant(12.3, -8.6);
-
-// --- Stations Definition ---
+// --- Stations. pos is the aisle spot the crew stands on. machine is where the equipment sits. ---
+const AISLE = -2.55;
 const stations = [
-  { id: 'cups', name: 'Cups', color: 0xc8102e, pos: [-10.5, 0, -6.4], action: 'Grab a cup' },
-  { id: 'dairy', name: 'Dairy', color: 0x7ec8e3, pos: [-7, 0, -6.4], action: 'Add dairy' },
-  { id: 'syrups', name: 'Syrups', color: 0x6b3a22, pos: [-3.5, 0, -6.4], action: 'Pump syrup' },
-  { id: 'lids', name: 'Lids', color: 0x8fd4f8, pos: [0, 0, -6.4], action: 'Choose a lid' },
-  { id: 'ice', name: 'Ice', color: 0xb9e6ff, pos: [3.5, 0, -6.4], action: 'Add ice' },
-  { id: 'icedcoffee', name: 'Iced Coffee', color: 0x6b3a22, pos: [7, 0, -6.4], action: 'Pour iced coffee' },
-  { id: 'lemonade', name: 'Lemonade', color: 0xffd23a, pos: [10.5, 0, -6.4], action: 'Pour lemonade', hidden: true },
-  { id: 'javamix', name: 'Java Mix', color: 0x92400e, pos: [-10.5, 0, -1.6], action: 'Fill the machine' },
-  { id: 'stir', name: 'Stir', color: 0xf5b942, pos: [-7, 0, -1.6], action: 'Stir the cup' },
-  { id: 'topping', name: 'Topping', color: 0xfff6ea, pos: [-3.5, 0, -1.6], action: 'Add whipped topping' },
-  { id: 'drizzle', name: 'Drizzle', color: 0xe39a45, pos: [0, 0, -1.6], action: 'Add drizzle' },
-  { id: 'blender', name: 'Whipper', color: 0xf5b942, pos: [3.5, 0, -1.6], action: 'Whip 15 seconds' },
-  { id: 'sanitize', name: 'Sanitize', color: 0x06b6d4, pos: [7, 0, -1.6], action: 'Rinse the whipper' },
-  { id: 'trash', name: 'Trash', color: 0x64748b, pos: [10.5, 0, -1.6], action: 'Start the cup over' },
-  { id: 'counter', name: 'Hand-off', color: 0x10b981, pos: [0, 0, 6.2], action: 'Hand to the guest' }
+  { id: 'cups', name: 'Cups', color: 0xc8102e, pos: [-8.2, 0, -0.05], machine: [-8.2, 1.2], action: 'Grab a cup' },
+  { id: 'counter', name: 'Pickup', color: 0x2f9e44, pos: [3.4, 0, -0.05], machine: [3.4, 1.2], action: 'Hand to the guest' },
+  { id: 'javamix', name: 'Java Mix', color: 0x6b3a22, pos: [-12.2, 0, AISLE], machine: [-12.2, -3.9], action: 'Fill the machine' },
+  { id: 'blender', name: 'Whip', color: 0xe0a030, pos: [-10.0, 0, AISLE], machine: [-10.0, -3.9], action: 'Whip 15 seconds' },
+  { id: 'syrups', name: 'Syrup', color: 0x6b3a22, pos: [-7.6, 0, AISLE], machine: [-7.6, -3.9], action: 'Pump syrup' },
+  { id: 'topping', name: 'Topping', color: 0xf7f4ee, pos: [-5.6, 0, AISLE], machine: [-5.6, -3.9], action: 'Add whipped topping' },
+  { id: 'drizzle', name: 'Drizzle', color: 0xc68642, pos: [-3.8, 0, AISLE], machine: [-3.8, -3.9], action: 'Add drizzle' },
+  { id: 'lids', name: 'Lids', color: 0x9fd4ea, pos: [-1.8, 0, AISLE], machine: [-1.8, -3.9], action: 'Choose a lid' },
+  { id: 'dairy', name: 'Dairy', color: 0x22262c, pos: [0.4, 0, AISLE], machine: [0.4, -3.9], action: 'Add dairy' },
+  { id: 'stir', name: 'Stir', color: 0xc4a06a, pos: [2.4, 0, AISLE], machine: [2.4, -3.9], action: 'Stir the cup' },
+  { id: 'icedcoffee', name: 'Iced', color: 0x4a2818, pos: [4.6, 0, AISLE], machine: [4.6, -3.9], action: 'Pour iced coffee' },
+  { id: 'lemonade', name: 'Lemon', color: 0xf0c84a, pos: [6.8, 0, AISLE], machine: [6.8, -3.9], action: 'Pour lemonade', hidden: true },
+  { id: 'ice', name: 'Ice', color: 0xd5dde6, pos: [9.0, 0, AISLE], machine: [9.0, -3.9], action: 'Add ice' },
+  { id: 'sanitize', name: 'Sink', color: 0x8aa0a8, pos: [11.4, 0, AISLE], machine: [11.4, -3.9], action: 'Rinse the whipper' },
+  { id: 'trash', name: 'Trash', color: 0x3a3d44, pos: [13.5, 0, -1.4], machine: [13.5, -1.4], action: 'Start the cup over' }
 ];
-
-function addPart(parent, geo, material, x, y, z) {
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  parent.add(mesh);
-  return mesh;
-}
-
-function addPlinth(group) {
-  addPart(group, new THREE.CylinderGeometry(1.16, 1.28, 0.58, 14), lit(0xe39a45), 0, 0.29, 0);
-  addPart(group, new THREE.CylinderGeometry(1.0, 1.0, 0.12, 14), lit(0xffe3b0), 0, 0.6, 0);
-}
 
 const labelRedraws = [];
 function addLabel(group, st) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
+  canvas.width = 640;
+  canvas.height = 180;
   const tex = new THREE.CanvasTexture(canvas);
   function paint() {
     const c = canvas.getContext('2d');
-    c.clearRect(0, 0, 512, 128);
-    c.fillStyle = '#fff8ee';
-    canvasRoundRect(c, 8, 18, 496, 92, 40);
+    c.clearRect(0, 0, 640, 180);
+    c.fillStyle = 'rgba(20, 22, 26, 0.28)';
+    canvasRoundRect(c, 18, 28, 604, 132, 66);
     c.fill();
-    const hex = '#' + st.color.toString(16).padStart(6, '0');
-    c.fillStyle = hex;
-    canvasRoundRect(c, 24, 36, 22, 56, 10);
+    c.fillStyle = '#ffffff';
+    canvasRoundRect(c, 10, 14, 604, 132, 66);
     c.fill();
-    c.fillStyle = '#4a2818';
-    c.font = '700 40px Fredoka, Trebuchet MS, sans-serif';
+    c.strokeStyle = '#1c1e22';
+    c.lineWidth = 10;
+    canvasRoundRect(c, 10, 14, 604, 132, 66);
+    c.stroke();
+    c.fillStyle = '#1c1e22';
+    c.font = '700 78px Fredoka, Trebuchet MS, sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(st.name, 286, 66);
+    c.fillText(st.name, 312, 82);
     tex.needsUpdate = true;
   }
   paint();
   labelRedraws.push(paint);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-  sprite.position.set(0, 3.05, 0);
-  sprite.scale.set(2.65, 0.66, 1);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sprite.position.set(0, st.labelBase || 2.7, 0);
+  sprite.scale.set(2.8, 0.82, 1);
+  sprite.renderOrder = 2;
   group.add(sprite);
+  st.label = sprite;
 }
 
-function addFillMarks(group, x, z, y0) {
-  for (let i = 0; i < 4; i++) {
-    addPart(group, new THREE.BoxGeometry(0.32, 0.035, 0.045), lit(i === 3 ? 0xc8102e : 0xfff6ea), x, y0 + i * 0.16, z);
-  }
+function box(g, w, h, d, x, y, z, color) {
+  return addPart(g, new THREE.BoxGeometry(w, h, d), lit(color), x, y, z);
+}
+function outlined(g, w, h, d, x, y, z, color) {
+  box(g, w + 0.08, h * 0.86, d + 0.08, x, y - h * 0.04, z, 0x1a1c20);
+  return box(g, w, h, d, x, y, z + 0.03, color);
 }
 
 function buildStationBody(st, group) {
+  const y = 0.98;
   if (st.id === 'cups') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.7, 0.76, 0.82, 14), lit(0xc8102e), 0, 1.12, 0);
+    outlined(group, 0.7, 0.55, 0.5, 0, y + 0.2, 0, 0xc8102e);
     for (let i = 0; i < 4; i++) {
-      addPart(group, new THREE.CylinderGeometry(0.22, 0.18, 0.16, 10), lit(0xfffdfb), 0.08, 1.62 + i * 0.15, 0.2);
-      addPart(group, new THREE.CylinderGeometry(0.2, 0.2, 0.035, 10), lit(0xc8102e), 0.08, 1.62 + i * 0.15, 0.2);
+      addPart(group, new THREE.CylinderGeometry(0.13, 0.11, 0.12, 10), lit(0xfffdfb), -0.12 + (i % 2) * 0.24, y + 0.55 + Math.floor(i / 2) * 0.13, 0);
     }
     return;
   }
-  if (st.id === 'dairy') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.68, 0.74, 1.55, 14), lit(0xfffdfb), 0, 1.5, 0);
-    addPart(group, new THREE.CylinderGeometry(0.7, 0.7, 0.12, 14), lit(0xc8102e), 0, 1.85, 0);
-    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.46, 8), lit(0xf5b942), 0.48, 1.45, 0.28);
-    addPart(group, new THREE.CylinderGeometry(0.16, 0.14, 0.48, 10), lit(0xfff3d2), 0, 1.05, 0.72);
-    addPart(group, new THREE.SphereGeometry(0.12, 8, 8), lit(0xfffdfb), 0, 1.32, 0.72);
-    return;
-  }
-  if (st.id === 'syrups') {
-    addPlinth(group);
-    const bottleColors = [0x6b3a22, 0xe39a45, 0xc8102e];
-    bottleColors.forEach((color, i) => {
-      const x = (i - 1) * 0.42;
-      addPart(group, new THREE.CylinderGeometry(0.15, 0.18, 0.88, 10), lit(color), x, 1.18, 0.08);
-      addPart(group, new THREE.SphereGeometry(0.13, 8, 8), lit(color), x, 1.5, 0.05);
-      addPart(group, new THREE.CylinderGeometry(0.04, 0.04, 0.28, 6), lit(0xfffdfb), x, 1.72, 0.05);
-      addPart(group, new THREE.SphereGeometry(0.07, 8, 6), lit(0xf5b942), x, 1.9, 0.05);
-    });
-    return;
-  }
-  if (st.id === 'lids') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.8, 0.86, 0.62, 14), lit(0x8fd4f8), 0, 1.05, 0);
-    const spots = [[0, 0.15], [-0.28, -0.05], [0.28, -0.02], [0.05, -0.22], [-0.08, 0.28]];
-    spots.forEach((spot) => {
-      addPart(group, new THREE.SphereGeometry(0.2, 10, 8), lit(0xf4fbff), spot[0], 1.42, spot[1]);
-    });
+  if (st.id === 'counter') {
+    outlined(group, 0.55, 0.7, 0.4, -0.35, y + 0.32, 0, 0x2a2c31);
+    box(group, 0.42, 0.28, 0.06, -0.35, y + 0.5, 0.22, 0x7ec8e3);
+    box(group, 0.7, 0.06, 0.55, 0.35, y + 0.04, 0, 0x2f9e44);
     return;
   }
   if (st.id === 'javamix') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.58, 0.66, 1.7, 14), lit(0x6b3a22), 0, 1.58, 0);
-    addPart(group, new THREE.CylinderGeometry(0.64, 0.64, 0.14, 14), lit(0xc8102e), 0, 2.15, 0);
-    addPart(group, new THREE.BoxGeometry(0.5, 0.7, 0.12), lit(0xfff3d4), 0, 1.45, 0.6);
-    const nozzle = addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe8e8e8), 0, 1.15, 0.72);
-    nozzle.rotation.x = Math.PI / 2;
-    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xc8102e), 0.32, 1.85, 0.5);
-    addFillMarks(group, 0, 0.68, 1.22);
-    return;
-  }
-  if (st.id === 'ice') {
-    addPlinth(group);
-    addPart(group, new THREE.BoxGeometry(1.15, 0.55, 0.9), lit(0x9fd4ef), 0, 1.05, 0);
-    addPart(group, new THREE.BoxGeometry(1.25, 0.12, 1.0), lit(0x7ec8e3), 0, 0.78, 0);
-    [[-0.28, 0.2], [0.05, 0.28], [0.3, 0.08], [-0.05, -0.12], [0.22, -0.2]].forEach((spot) => {
-      addPart(group, new THREE.BoxGeometry(0.22, 0.18, 0.18), lit(0xf7fbff), spot[0], 1.4, spot[1]);
-    });
-    return;
-  }
-  if (st.id === 'icedcoffee') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.42, 0.48, 1.55, 14), lit(0x4a2818), 0, 1.5, 0);
-    addPart(group, new THREE.CylinderGeometry(0.34, 0.36, 1.15, 14), lit(0x6b3a22), 0, 1.45, 0);
-    addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), lit(0xc8102e), 0, 2.2, 0);
-    const tap = addPart(group, new THREE.CylinderGeometry(0.06, 0.07, 0.28, 8), lit(0xfffdfb), 0, 1.15, 0.48);
-    tap.rotation.x = Math.PI / 2;
-    addFillMarks(group, 0.34, 0.28, 1.15);
-    return;
-  }
-  if (st.id === 'lemonade') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.42, 0.48, 1.55, 14), lit(0xfff3a0), 0, 1.5, 0);
-    addPart(group, new THREE.CylinderGeometry(0.34, 0.36, 1.15, 14), lit(0xffd23a), 0, 1.45, 0);
-    addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), lit(0xc8102e), 0, 2.2, 0);
-    addPart(group, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfff6ea), 0.22, 1.7, 0.22);
-    addFillMarks(group, 0.34, 0.28, 1.15);
-    return;
-  }
-  if (st.id === 'stir') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.34, 0.38, 0.7, 12), lit(0xfffdfb), 0, 1.1, 0);
-    addPart(group, new THREE.CylinderGeometry(0.38, 0.38, 0.1, 12), lit(0xc8102e), 0, 1.42, 0);
-    const spoon = addPart(group, new THREE.CylinderGeometry(0.035, 0.035, 0.85, 6), lit(0xf5b942), 0.16, 1.7, 0.05);
-    spoon.rotation.z = 0.4;
-    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xfffdfb), 0.32, 2.02, 0.05);
-    return;
-  }
-  if (st.id === 'topping') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.38, 0.42, 0.95, 12), lit(0xfffdfb), 0, 1.2, 0);
-    addPart(group, new THREE.CylinderGeometry(0.28, 0.28, 0.16, 12), lit(0xc8102e), 0, 1.72, 0);
-    addPart(group, new THREE.SphereGeometry(0.28, 12, 10), lit(0xfff6ea), 0, 1.95, 0);
-    addPart(group, new THREE.SphereGeometry(0.16, 10, 8), lit(0xffffff), 0.12, 2.18, 0.06);
-    return;
-  }
-  if (st.id === 'drizzle') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.2, 0.26, 0.9, 10), lit(0xc68642), -0.22, 1.2, 0);
-    addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe39a45), -0.22, 1.72, 0);
-    addPart(group, new THREE.CylinderGeometry(0.2, 0.26, 0.9, 10), lit(0x6b3a22), 0.22, 1.2, 0.05);
-    addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xf5b942), 0.22, 1.72, 0.05);
-    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xfffdfb), 0, 1.55, 0.28);
+    outlined(group, 1.35, 1.45, 0.7, 0, y + 0.7, 0, 0xf2f3f5);
+    box(group, 1.2, 0.16, 0.08, 0, y + 1.15, 0.36, 0xc8102e);
+    box(group, 0.42, 0.55, 0.08, -0.28, y + 0.7, 0.36, 0x6b3a22);
+    box(group, 0.42, 0.55, 0.08, 0.28, y + 0.7, 0.36, 0xc68642);
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.22, 10), lit(0x2a2c31), -0.28, y + 1.5, 0);
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.22, 10), lit(0x2a2c31), 0.28, y + 1.5, 0);
     return;
   }
   if (st.id === 'blender') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.55, 0.62, 0.7, 14), lit(0xf5b942), 0, 1.1, 0);
-    addPart(group, new THREE.CylinderGeometry(0.11, 0.11, 1.05, 8), lit(0xfffdfb), 0, 1.72, 0);
-    addPart(group, new THREE.CylinderGeometry(0.3, 0.34, 0.4, 12), lit(0xffd15c), 0, 2.28, 0);
+    outlined(group, 0.7, 0.35, 0.55, 0, y + 0.16, 0, 0xe6e8ea);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.85, 8), lit(0x1c1e22), -0.16, y + 0.7, 0);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.85, 8), lit(0x1c1e22), 0.16, y + 0.7, 0);
+    addPart(group, new THREE.CylinderGeometry(0.12, 0.14, 0.16, 8), lit(0xe0a030), -0.16, y + 1.15, 0);
+    addPart(group, new THREE.CylinderGeometry(0.12, 0.14, 0.16, 8), lit(0xe0a030), 0.16, y + 1.15, 0);
+    return;
+  }
+  if (st.id === 'syrups') {
+    outlined(group, 1.15, 0.28, 0.42, 0, y + 0.1, 0, 0x2a2c31);
+    [0x6b3a22, 0xc8102e, 0xe0a030, 0xf3e27a, 0x4a2818].forEach((color, i) => {
+      const x = (i - 2) * 0.2;
+      addPart(group, new THREE.CylinderGeometry(0.07, 0.08, 0.55, 8), lit(color), x, y + 0.48, 0);
+      addPart(group, new THREE.CylinderGeometry(0.025, 0.025, 0.16, 6), lit(0xf7f7f7), x, y + 0.8, 0);
+    });
+    return;
+  }
+  if (st.id === 'topping') {
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.7, 10), lit(0xf7f4ee), 0, y + 0.4, 0);
+    addPart(group, new THREE.CylinderGeometry(0.08, 0.08, 0.16, 8), lit(0xc8102e), 0, y + 0.8, 0);
+    addPart(group, new THREE.CylinderGeometry(0.03, 0.05, 0.28, 6), lit(0xd0d3d6), 0.12, y + 0.55, 0.1);
+    return;
+  }
+  if (st.id === 'drizzle') {
+    addPart(group, new THREE.CylinderGeometry(0.09, 0.11, 0.48, 8), lit(0xc68642), -0.14, y + 0.28, 0);
+    addPart(group, new THREE.CylinderGeometry(0.09, 0.11, 0.48, 8), lit(0x4a2818), 0.14, y + 0.28, 0);
+    addPart(group, new THREE.CylinderGeometry(0.035, 0.02, 0.16, 6), lit(0xf7f4ee), -0.14, y + 0.56, 0);
+    addPart(group, new THREE.CylinderGeometry(0.035, 0.02, 0.16, 6), lit(0xf7f4ee), 0.14, y + 0.56, 0);
+    return;
+  }
+  if (st.id === 'lids') {
+    outlined(group, 0.9, 0.55, 0.45, 0, y + 0.28, 0, 0x2a2c31);
+    [[-0.22, 0.15], [0.05, 0.22], [0.22, 0.05], [-0.1, -0.05]].forEach((spot) => {
+      addPart(group, new THREE.CylinderGeometry(0.16, 0.16, 0.05, 10), lit(0xf4fbff), spot[0], y + 0.62, spot[1] * 0.4);
+    });
+    return;
+  }
+  if (st.id === 'dairy') {
+    outlined(group, 0.7, 1.15, 0.55, 0, y + 0.55, 0, 0x1e2126);
+    box(group, 0.4, 0.22, 0.06, 0, y + 0.95, 0.28, 0x7ec8e3);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), lit(0xd5d8dc), -0.12, y + 0.35, 0.28);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), lit(0xd5d8dc), 0.12, y + 0.35, 0.28);
+    return;
+  }
+  if (st.id === 'stir') {
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.28, 10), lit(0xf7f4ee), 0, y + 0.16, 0);
+    addPart(group, new THREE.CylinderGeometry(0.02, 0.02, 0.45, 6), lit(0xc4a06a), 0.05, y + 0.42, 0);
+    addPart(group, new THREE.SphereGeometry(0.05, 8, 6), lit(0xf7f4ee), 0.05, y + 0.66, 0);
+    return;
+  }
+  if (st.id === 'icedcoffee') {
+    outlined(group, 0.62, 1.35, 0.62, 0, y + 0.65, 0, 0xd5d8dc);
+    addPart(group, new THREE.CylinderGeometry(0.2, 0.22, 0.9, 12), lit(0x4a2818), 0, y + 0.7, 0.02);
+    const tap = addPart(group, new THREE.CylinderGeometry(0.04, 0.05, 0.2, 8), lit(0x1c1e22), 0, y + 0.4, 0.32);
+    tap.rotation.x = Math.PI / 2;
+    return;
+  }
+  if (st.id === 'lemonade') {
+    outlined(group, 0.48, 1.25, 0.48, 0, y + 0.6, 0, 0xd5d8dc);
+    addPart(group, new THREE.CylinderGeometry(0.15, 0.17, 0.8, 12), lit(0xf0c84a), 0, y + 0.65, 0.02);
+    const tap = addPart(group, new THREE.CylinderGeometry(0.035, 0.04, 0.18, 8), lit(0x1c1e22), 0, y + 0.38, 0.26);
+    tap.rotation.x = Math.PI / 2;
+    return;
+  }
+  if (st.id === 'ice') {
+    outlined(group, 1.05, 0.55, 0.7, 0, y + 0.26, 0, 0xd5d8dc);
+    [[-0.25, 0.1], [0.05, 0.16], [0.28, 0], [-0.05, -0.12]].forEach((spot) => {
+      box(group, 0.16, 0.12, 0.14, spot[0], y + 0.58, spot[1], 0xf7fbff);
+    });
     return;
   }
   if (st.id === 'sanitize') {
-    addPlinth(group);
-    addPart(group, new THREE.CylinderGeometry(0.86, 0.9, 0.42, 16), lit(0x3ecbdc), 0, 0.95, 0);
-    const water = addPart(group, new THREE.CircleGeometry(0.7, 16), lit(0x1aa8c4), 0, 1.12, 0);
-    water.rotation.x = -Math.PI / 2;
-    addPart(group, new THREE.CylinderGeometry(0.2, 0.16, 0.4, 10), lit(0xfffdfb), 0.15, 1.22, 0.15);
+    outlined(group, 0.95, 0.28, 0.6, 0, y + 0.12, 0, 0xc5cdd2);
+    box(group, 0.55, 0.12, 0.36, 0, y + 0.28, 0, 0x8fb4c4);
+    addPart(group, new THREE.CylinderGeometry(0.04, 0.04, 0.45, 8), lit(0xd5d8dc), 0.28, y + 0.5, 0);
+    const spout = addPart(group, new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8), lit(0xd5d8dc), 0.1, y + 0.62, 0);
+    spout.rotation.z = Math.PI / 2;
     return;
   }
-  if (st.id === 'counter') {
-    addPart(group, new THREE.CylinderGeometry(1.35, 1.45, 0.78, 16), lit(0xe39a45), 0, 0.39, 0);
-    addPart(group, new THREE.CylinderGeometry(1.2, 1.2, 0.12, 16), lit(0xffe3b0), 0, 0.8, 0);
-    const mat = addPart(group, new THREE.CircleGeometry(0.7, 18), lit(0x3cba6e), 0, 0.9, 0);
-    mat.rotation.x = -Math.PI / 2;
-    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.1, 10), lit(0xf5b942), 0.55, 0.95, 0.2);
-    addPart(group, new THREE.SphereGeometry(0.14, 10, 8), lit(0xf5b942), 0.55, 1.12, 0.2);
-    return;
-  }
-  addPart(group, new THREE.CylinderGeometry(0.62, 0.7, 1.05, 14), lit(0x8d95a8), 0, 0.62, 0);
-  addPart(group, new THREE.CylinderGeometry(0.68, 0.68, 0.1, 14), lit(0x5e6778), 0, 1.12, 0);
-  addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.08, 14), lit(0xd5dbe6), 0.1, 1.22, -0.02);
+  outlined(group, 0.45, 0.7, 0.4, 0, 0.4, 0, 0x3a3d44);
+  addPart(group, new THREE.CylinderGeometry(0.2, 0.22, 0.08, 10), lit(0x1c1e22), 0, 0.78, 0);
 }
 
-stations.forEach(st => {
+function dressBackLine() {
+  function brewer(x, z, body, windowColor) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    outlined(g, 0.7, 1.15, 0.55, 0, 1.55, 0, body);
+    box(g, 0.4, 0.28, 0.06, 0, 1.7, 0.28, windowColor);
+    box(g, 0.5, 0.08, 0.5, 0, 2.15, 0, 0x1c1e22);
+    scene.add(g);
+  }
+  brewer(-6.5, -7.15, 0xd5d8dc, 0x6b3a22);
+  brewer(-4.6, -7.15, 0xc5c8cc, 0x3a2418);
+  const imix = new THREE.Group();
+  imix.position.set(-2.2, 0, -7.15);
+  outlined(imix, 0.85, 1.35, 0.6, 0, 1.65, 0, 0x2a2c31);
+  box(imix, 0.55, 0.4, 0.06, 0, 1.85, 0.32, 0xc8102e);
+  box(imix, 0.2, 0.12, 0.08, -0.16, 1.25, 0.32, 0xf3e27a);
+  box(imix, 0.2, 0.12, 0.08, 0.16, 1.25, 0.32, 0x6b3a22);
+  scene.add(imix);
+  const icedBrew = new THREE.Group();
+  icedBrew.position.set(0.6, 0, -7.15);
+  outlined(icedBrew, 0.7, 1.5, 0.6, 0, 1.72, 0, 0xe6e8ea);
+  addPart(icedBrew, new THREE.CylinderGeometry(0.18, 0.2, 0.7, 12), lit(0x4a2818), 0, 1.55, 0.05);
+  scene.add(icedBrew);
+  const sugar = new THREE.Group();
+  sugar.position.set(2.8, 0, -7.15);
+  outlined(sugar, 0.55, 0.7, 0.4, 0, 1.32, 0, 0xf7f4ee);
+  box(sugar, 0.4, 0.08, 0.08, 0, 1.55, 0.18, 0xc8102e);
+  scene.add(sugar);
+  const fridge = new THREE.Group();
+  fridge.position.set(5.2, 0, -7.15);
+  outlined(fridge, 1.1, 1.05, 0.6, 0, 1.5, 0, 0xd5d8dc);
+  box(fridge, 0.9, 0.7, 0.06, 0, 1.55, 0.3, 0xb9d4e4);
+  scene.add(fridge);
+  const espresso = new THREE.Group();
+  espresso.position.set(8.4, 0, 1.2);
+  outlined(espresso, 1.3, 0.7, 0.55, 0, 1.32, 0, 0x1c1e22);
+  box(espresso, 0.7, 0.18, 0.06, 0, 1.55, 0.28, 0x9fd4ea);
+  addPart(espresso, new THREE.CylinderGeometry(0.1, 0.12, 0.28, 10), lit(0xd5d8dc), -0.28, 1.15, 0.2);
+  addPart(espresso, new THREE.CylinderGeometry(0.1, 0.12, 0.28, 10), lit(0xd5d8dc), 0.28, 1.15, 0.2);
+  scene.add(espresso);
+}
+dressBackLine();
+
+stations.forEach((st, index) => {
   const group = new THREE.Group();
-  group.position.set(st.pos[0], 0, st.pos[2]);
-  buildStationBody(st, group);
+  const machine = st.machine || [st.pos[0], st.pos[2]];
+  group.position.set(machine[0], 0, machine[1]);
+  const body = new THREE.Group();
+  body.scale.set(1.4, 1.4, 1.4);
+  body.position.y = -0.32;
+  group.add(body);
+  buildStationBody(st, body);
+  st.labelBase = 2.15 + (index % 2) * 0.7;
 
   const ringMesh = new THREE.Mesh(
-    new THREE.RingGeometry(1.45, 1.78, 28),
-    new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+    new THREE.RingGeometry(0.42, 0.62, 24),
+    new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
   );
   ringMesh.rotation.x = -Math.PI / 2;
-  ringMesh.position.y = 0.035;
+  ringMesh.position.set(st.pos[0] - machine[0], 0.05, st.pos[2] - machine[1]);
   group.add(ringMesh);
   addLabel(group, st);
 
   const arrow = new THREE.Mesh(
-    new THREE.ConeGeometry(0.28, 0.52, 10),
+    new THREE.ConeGeometry(0.22, 0.4, 8),
     new THREE.MeshBasicMaterial({ color: 0x2f6bff })
   );
-  arrow.position.set(0, 3.95, 0);
+  arrow.position.set(0, 3.35, 0);
   arrow.visible = false;
   group.add(arrow);
 
@@ -953,6 +1052,7 @@ stations.forEach(st => {
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(() => labelRedraws.forEach((paint) => paint()));
 }
+
 
 // --- Player Character (chibi Tim Hortons crew, eyes and arms kept) ---
 const playerGroup = new THREE.Group();
@@ -1080,7 +1180,8 @@ scene.add(playerGroup);
 
 // Guest already waiting at the counter. Bubble keeps its original words.
 const customerGroup = new THREE.Group();
-customerGroup.position.set(0, 0, 8.55);
+customerGroup.position.set(3.4, 0, 2.85);
+customerGroup.rotation.y = Math.PI;
 addPart(customerGroup, new THREE.CylinderGeometry(0.42, 0.48, 0.7, 14), lit(0x4aa3f0), 0, 0.7, 0);
 addPart(customerGroup, new THREE.SphereGeometry(0.5, 16, 14), skinMat, 0, 1.38, 0);
 addPart(customerGroup, new THREE.SphereGeometry(0.42, 12, 10), lit(0x6b3a22), 0, 1.68, -0.02);
@@ -1553,7 +1654,7 @@ function interactWithStation(st) {
 function bootCafe() {
   progress = loadProgress();
   TBR.ensureRecords(progress);
-  playerGroup.position.set(0, 0, 2.2);
+  playerGroup.position.set(0, 0, -1.5);
   revealUnlockedStations();
   document.getElementById('unlockOk').addEventListener('pointerdown', (event) => {
     event.preventDefault();
@@ -1796,13 +1897,13 @@ function reactToAlert(text, success) {
 function updateFollow() {
   const aspectNow = window.innerWidth / Math.max(1, window.innerHeight);
   const portrait = aspectNow < 0.9;
-  viewSize = portrait ? 12 : 14;
-  const desiredX = portrait ? playerGroup.position.x + 1.8 : 0;
-  const desiredZ = portrait ? playerGroup.position.z + 1.8 : 0;
+  viewSize = portrait ? 8.6 : 11.5;
+  const desiredX = portrait ? playerGroup.position.x : -1.6;
+  const desiredZ = portrait ? playerGroup.position.z : -2.2;
   const blend = portrait ? 0.12 : 1;
   lookTarget.x += (desiredX - lookTarget.x) * blend;
   lookTarget.z += (desiredZ - lookTarget.z) * blend;
-  camera.position.set(lookTarget.x + 20, 24, lookTarget.z + 20);
+  camera.position.set(lookTarget.x + 16, 11, lookTarget.z + 16);
   camera.lookAt(lookTarget.x, 0, lookTarget.z);
   camera.left = -viewSize * aspectNow;
   camera.right = viewSize * aspectNow;
@@ -1889,11 +1990,14 @@ function animate(now) {
     if (easing) speed = 0.055;
   }
   if (vx !== 0 || vz !== 0) {
-    playerGroup.position.x += vx * speed;
-    playerGroup.position.z += vz * speed;
-
-    playerGroup.position.x = Math.max(-11.6, Math.min(11.6, playerGroup.position.x));
-    playerGroup.position.z = Math.max(-8.15, Math.min(8.15, playerGroup.position.z));
+    const stepX = vx * speed;
+    const stepZ = vz * speed;
+    if (!blockedAt(playerGroup.position.x + stepX, playerGroup.position.z, 0.34)) {
+      playerGroup.position.x += stepX;
+    }
+    if (!blockedAt(playerGroup.position.x, playerGroup.position.z + stepZ, 0.34)) {
+      playerGroup.position.z += stepZ;
+    }
 
     const angle = Math.atan2(vx, vz);
     playerGroup.rotation.y = angle;
@@ -1911,7 +2015,7 @@ function animate(now) {
   const step = order && order.steps[cursor];
   const glowOn = !!(step && order && TBR.ticketView(order, drinkRecord().mastery || 0).glow);
   let nearbyStation = null;
-  let nearbyDist = 1.85;
+  let nearbyDist = 1.15;
   stations.forEach(st => {
     if (!st.mesh.visible) {
       if (st.arrow) st.arrow.visible = false;
@@ -1940,6 +2044,11 @@ function animate(now) {
     if (dist < nearbyDist) {
       nearbyStation = st;
       nearbyDist = dist;
+    }
+    if (st.label) {
+      const near = dist < 1.35;
+      st.label.scale.set(near ? 3.6 : 2.8, near ? 1.05 : 0.82, 1);
+      st.label.position.y = (st.labelBase || 2.5) + (near ? 0.35 : 0);
     }
   });
 
