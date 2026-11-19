@@ -1199,13 +1199,14 @@ bubbleCanvas.height = 180;
 let bubbleLine1 = 'New order';
 let bubbleLine2 = 'coming up';
 let bubbleStars = '';
+let frontGuestMood = 0;
 function paintBubble() {
   const bctx = bubbleCanvas.getContext('2d');
   bctx.clearRect(0, 0, 420, 180);
   bctx.fillStyle = '#fffdfb';
   canvasRoundRect(bctx, 8, 8, 404, 164, 46);
   bctx.fill();
-  bctx.strokeStyle = '#c8102e';
+  bctx.strokeStyle = frontGuestMood === 2 ? '#d23b4a' : frontGuestMood === 1 ? '#e39b14' : '#c8102e';
   bctx.lineWidth = 8;
   canvasRoundRect(bctx, 8, 8, 404, 164, 46);
   bctx.stroke();
@@ -1230,6 +1231,174 @@ customerGroup.add(bubbleSprite);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintBubble);
 
 scene.add(customerGroup);
+customerGroup.visible = false;
+
+// A line of guests on the guest side of the front counter.
+const guestQueue = [];
+let guestsServed = 0;
+let guestSerial = 0;
+const SHIRTS = [0x3d7ec9, 0x2f9e44, 0x7a4e9a, 0xc46a2f, 0x3a6ea5];
+
+function buildGuest(shirt) {
+  const g = new THREE.Group();
+  const bodyMat = lit(shirt);
+  const headMat = lit(0xffc9a4);
+  addPart(g, new THREE.CylinderGeometry(0.36, 0.42, 0.6, 12), bodyMat, 0, 0.58, 0);
+  addPart(g, new THREE.SphereGeometry(0.38, 14, 12), headMat, 0, 1.16, 0);
+  addPart(g, new THREE.SphereGeometry(0.32, 10, 8), lit(0x3a2418), 0, 1.42, -0.02);
+  const mouth = addPart(g, new THREE.BoxGeometry(0.16, 0.04, 0.04), lit(0xc46a5a), 0, 1.02, 0.32);
+  const steam = addPart(g, new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }), 0.26, 1.5, 0.08);
+  g.userData = { bodyMat, headMat, mouth, steam, shirt };
+  return g;
+}
+
+function drinksForNewGuest() {
+  if (guestsServed < 2) return 1;
+  if (guestsServed < 4) return 2;
+  return 3;
+}
+
+function spawnGuest() {
+  if (guestQueue.length >= 4) return;
+  const shirt = SHIRTS[guestSerial % SHIRTS.length];
+  guestSerial += 1;
+  const group = buildGuest(shirt);
+  const slot = guestQueue.length;
+  group.position.set(1.2 - slot * 1.7, 0, 2.65);
+  scene.add(group);
+  const patience = 48 + slot * 14;
+  guestQueue.push({
+    group: group,
+    count: drinksForNewGuest(),
+    drinks: [],
+    drinkIndex: 0,
+    patience: patience,
+    maxPatience: patience,
+    mood: 0,
+    state: 'line'
+  });
+}
+
+function guestSpot(index, guest) {
+  if (guest && guest.state === 'pickup') return { x: 5.7, z: 2.72 };
+  if (index === 0) return { x: 3.3, z: 2.78 };
+  return { x: 3.3 - index * 1.7, z: 2.62 };
+}
+
+function paintGuestMood(guest) {
+  const ratio = guest.maxPatience ? guest.patience / guest.maxPatience : 1;
+  const mood = ratio < 0.28 ? 2 : ratio < 0.55 ? 1 : 0;
+  guest.mood = mood;
+  if (guest === guestQueue[0]) frontGuestMood = mood;
+  const data = guest.group.userData;
+  if (mood === 2) {
+    data.bodyMat.color.setHex(0xd23b4a);
+    data.headMat.color.setHex(0xf09a8c);
+    data.mouth.scale.set(1, 0.4, 1);
+    data.steam.material.opacity = 0.9;
+  } else if (mood === 1) {
+    data.bodyMat.color.setHex(data.shirt);
+    data.headMat.color.setHex(0xf0b8a4);
+    data.mouth.scale.set(1, 0.45, 1);
+    data.steam.material.opacity = 0;
+  } else {
+    data.bodyMat.color.setHex(data.shirt);
+    data.headMat.color.setHex(0xffc9a4);
+    data.mouth.scale.set(1.15, 1, 1);
+    data.steam.material.opacity = 0;
+  }
+  if (guest === guestQueue[0]) paintBubble();
+}
+
+function assignGuestDrinks(guest) {
+  if (guest.drinks.length) return;
+  for (let n = 0; n < guest.count; n++) {
+    const drink = TBR.pickOrder(progress);
+    TBR.noteOrder(progress, drink.id);
+    guest.drinks.push(drink);
+  }
+  TBR.ensureRecords(progress);
+}
+
+function orderListLabel(guest) {
+  return guest.drinks.map((drink) => drink.name).join(' + ');
+}
+
+function loadCurrentDrink() {
+  const guest = guestQueue[0];
+  if (!guest) return;
+  assignGuestDrinks(guest);
+  order = guest.drinks[guest.drinkIndex];
+  if (!order) return;
+  closeChoices();
+  cursor = 0;
+  orderClean = true;
+  bonusLost = false;
+  startedHintsOff = TBR.hintStage((drinkRecord().mastery) || 0) === 4;
+  ticketTimer = TBR.ORDER_SECONDS;
+  heldItem = emptyHands();
+  saveProgress();
+  updateTicketDisplay();
+  updateHeldDisplay();
+}
+
+function removeGuest(guest) {
+  const index = guestQueue.indexOf(guest);
+  if (index < 0) return;
+  if (bubbleSprite.parent === guest.group) guest.group.remove(bubbleSprite);
+  scene.remove(guest.group);
+  guestQueue.splice(index, 1);
+  if (!guestQueue.length) spawnGuest();
+  const front = guestQueue[0];
+  if (front && bubbleSprite.parent !== front.group) front.group.add(bubbleSprite);
+  if (front && !front.drinks.length) {
+    ticketNumber += 1;
+    loadCurrentDrink();
+    if (order) showAlert('🎫 New Order! ' + orderListLabel(front), true);
+  }
+}
+
+function stormOff(guest) {
+  if (guest.state === 'leaving') return;
+  const front = guestQueue[0] === guest;
+  guest.state = 'leaving';
+  guestsServed += 1;
+  if (front) {
+    streak = 0;
+    paintStreak();
+    bonusLost = true;
+    closeChoices();
+    heldItem = emptyHands();
+    updateHeldDisplay();
+    order = null;
+    showAlert('They stormed off. The streak and the bonus went with them.', 'soft');
+  }
+  setTimeout(() => removeGuest(guest), 800);
+}
+
+function stepGuests(dt) {
+  for (let i = guestQueue.length - 1; i >= 0; i--) {
+    const guest = guestQueue[i];
+    const data = guest.group.userData;
+    if (guest.state === 'leaving') {
+      guest.group.position.x += 0.05;
+      guest.group.rotation.z = Math.sin(Date.now() * 0.02) * 0.2;
+      if (guest.group.position.x > 16) removeGuest(guest);
+      continue;
+    }
+    const spot = guestSpot(i, guest);
+    guest.group.position.x += (spot.x - guest.group.position.x) * 0.08;
+    guest.group.position.z += (spot.z - guest.group.position.z) * 0.08;
+    if (!unlockOpen) {
+      guest.patience -= dt * (i === 0 ? 1 : 0.32);
+      paintGuestMood(guest);
+      if (guest.mood === 2) guest.group.position.y = Math.abs(Math.sin(Date.now() * 0.012)) * 0.08;
+      else guest.group.position.y = 0;
+      if (data.steam.material.opacity > 0) data.steam.position.y = 1.5 + Math.sin(Date.now() * 0.008) * 0.08;
+      if (guest.patience <= 0) stormOff(guest);
+    }
+  }
+}
 
 // --- Orders from the real build cards ---
 const SAVE_KEY = 'tbr-progress';
@@ -1477,11 +1646,23 @@ function updateTicketDisplay() {
   const mastery = drinkRecord().mastery || 0;
   const view = TBR.ticketView(order, mastery);
   document.getElementById('ticketId').textContent = String(ticketNumber);
-  document.getElementById('ticketTitle').textContent = order.name;
+  const front = guestQueue[0];
+  const lines = view.lines.slice();
+  if (front && front.drinks.length > 1) {
+    const list = front.drinks.map((drink, index) => {
+      if (index < front.drinkIndex) return '✓ ' + drink.name;
+      if (index === front.drinkIndex) return '▸ ' + drink.name;
+      return '○ ' + drink.name;
+    });
+    document.getElementById('ticketTitle').textContent = 'Cup ' + (front.drinkIndex + 1) + ' of ' + front.drinks.length;
+    document.getElementById('ticketSteps').textContent = list.concat(['']).concat(lines).join('\n');
+  } else {
+    document.getElementById('ticketTitle').textContent = order.name;
+    document.getElementById('ticketSteps').textContent = lines.join('\n');
+  }
   document.getElementById('ticketStars').textContent = view.stars;
   document.getElementById('hintBadge').textContent = view.label;
   document.getElementById('masteryMeter').style.width = Math.round(mastery) + '%';
-  document.getElementById('ticketSteps').textContent = view.lines.join('\n');
   const icons = document.getElementById('ticketIcons');
   icons.innerHTML = '';
   view.icons.forEach((icon) => {
@@ -1492,9 +1673,15 @@ function updateTicketDisplay() {
   icons.style.display = view.icons.length ? 'flex' : 'none';
   const secs = Math.max(0, Math.ceil(ticketTimer));
   document.getElementById('timerVal').textContent = '0:' + String(secs).padStart(2, '0');
-  bubbleLine1 = order.bubble.line1;
-  bubbleLine2 = order.bubble.line2;
-  bubbleStars = view.stars;
+  const moodGuest = guestQueue[0];
+  if (moodGuest && moodGuest.drinks.length > 1) {
+    bubbleLine1 = moodGuest.drinks[0].name;
+    bubbleLine2 = moodGuest.drinks.slice(1).map((drink) => drink.name).join(' · ');
+  } else {
+    bubbleLine1 = order.bubble.line1;
+    bubbleLine2 = order.bubble.line2;
+  }
+  bubbleStars = (moodGuest && moodGuest.mood === 2 ? '😤 ' : moodGuest && moodGuest.mood === 1 ? '😐 ' : '') + view.stars;
   paintBubble();
 }
 
@@ -1593,20 +1780,16 @@ function hideAlert() {
 function startOrder(isFirst) {
   closeChoices();
   hideAlert();
-  order = TBR.pickOrder(progress);
-  TBR.noteOrder(progress, order.id);
-  TBR.ensureRecords(progress);
-  cursor = 0;
-  orderClean = true;
-  bonusLost = false;
-  startedHintsOff = TBR.hintStage(drinkRecord().mastery || 0) === 4;
-  ticketTimer = TBR.ORDER_SECONDS;
-  heldItem = emptyHands();
+  if (!guestQueue.length) {
+    spawnGuest();
+    spawnGuest();
+    spawnGuest();
+  }
+  const front = guestQueue[0];
+  if (front && bubbleSprite.parent !== front.group) front.group.add(bubbleSprite);
   if (!isFirst) ticketNumber += 1;
-  saveProgress();
-  updateTicketDisplay();
-  updateHeldDisplay();
-  showAlert('🎫 New Order! ' + order.name, true);
+  loadCurrentDrink();
+  if (order && front) showAlert('🎫 New Order! ' + orderListLabel(front), true);
 }
 
 function completeOrder() {
@@ -1619,14 +1802,39 @@ function completeOrder() {
   revenue += result.revenue;
   document.getElementById('scoreVal').textContent = String(score);
   document.getElementById('revenueVal').textContent = revenue.toFixed(2);
-  customerGroup.position.y = 0.55;
-  setTimeout(() => { customerGroup.position.y = 0; }, 320);
+  const guest = guestQueue[0];
+  if (guest) {
+    guest.group.position.y = 0.4;
+    setTimeout(() => { if (guest.group) guest.group.position.y = 0; }, 280);
+  }
   saveProgress();
   if (result.perfect) showAlert('Perfect Build! Customer served! (+150 pts)', true);
   else if (orderClean) showAlert('Served! The time bonus already left.', 'soft');
   else showAlert('Served — the cup still made it.', 'soft');
   if (maybeUnlock()) return;
-  setTimeout(() => { if (!unlockOpen) startOrder(false); }, 700);
+  if (!guest) {
+    setTimeout(() => { if (!unlockOpen) startOrder(false); }, 700);
+    return;
+  }
+  guest.drinkIndex += 1;
+  if (guest.drinkIndex < guest.drinks.length) {
+    setTimeout(() => { if (!unlockOpen && guestQueue[0] === guest) loadCurrentDrink(); }, 500);
+    return;
+  }
+  if (guest.patience / guest.maxPatience > 0.62 && orderClean && inTime) {
+    revenue += 1.25;
+    document.getElementById('revenueVal').textContent = revenue.toFixed(2);
+    floatPoints('Tip!');
+  }
+  guest.state = 'pickup';
+  guestsServed += 1;
+  setTimeout(() => {
+    guest.state = 'leaving';
+    setTimeout(() => {
+      removeGuest(guest);
+      if (guestQueue.length < 3) spawnGuest();
+    }, 700);
+  }, 650);
 }
 
 function interactWithStation(st) {
@@ -1899,7 +2107,7 @@ function updateFollow() {
   const portrait = aspectNow < 0.9;
   viewSize = portrait ? 8.6 : 11.5;
   const desiredX = portrait ? playerGroup.position.x : -1.6;
-  const desiredZ = portrait ? playerGroup.position.z : -2.2;
+  const desiredZ = portrait ? playerGroup.position.z + 2.4 : -2.2;
   const blend = portrait ? 0.12 : 1;
   lookTarget.x += (desiredX - lookTarget.x) * blend;
   lookTarget.z += (desiredZ - lookTarget.z) * blend;
@@ -2091,6 +2299,7 @@ function animate(now) {
     }
   });
 
+  if (typeof stepGuests === 'function') stepGuests(dt);
   updateFollow();
   renderer.render(scene, camera);
 }
