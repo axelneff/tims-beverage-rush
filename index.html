@@ -320,7 +320,7 @@
     z-index: 30;
     white-space: nowrap;
   }
-.combo-pop.go { animation: comboPop 1.7s ease; }
+.combo-pop.go { opacity: 1; animation: comboPop 1.7s ease; }
 @keyframes comboPop {
   0% { opacity: 0; transform: translate(-50%, -30%) scale(0.55); }
   12% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
@@ -337,7 +337,8 @@
     color: #fff;
     -webkit-text-stroke: 5px #e39b14;
     paint-order: stroke fill;
-    animation: floatUp 0.95s ease forwards;
+    opacity: 1;
+    animation: floatUp 1.15s ease forwards;
   }
   @keyframes floatUp {
     0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
@@ -1334,6 +1335,8 @@ function showCombo(n) {
   el.classList.remove('go');
   void el.offsetWidth;
   el.classList.add('go');
+  clearTimeout(showCombo.timer);
+  showCombo.timer = setTimeout(() => el.classList.remove('go'), 1700);
 }
 function mistakeFx() {
   const flash = document.getElementById('flash');
