@@ -490,6 +490,7 @@
     <div class="hud-badge" title="Score">⭐ <b id="scoreVal">0</b></div>
     <div class="hud-badge" title="Streak">🔥 <b id="streakVal">0</b></div>
     <div class="hud-badge" title="Order timer">⏱ <b id="timerVal">0:35</b></div>
+    <div class="hud-badge" id="driveBadge" title="Drive-thru cars">🚗 <b id="driveCount">0</b></div>
     <div class="hud-badge" title="Revenue">💵 $<b id="revenueVal">0</b></div>
   </div>
 </div>
@@ -818,6 +819,7 @@ const stations = [
   { id: 'lemonade', name: 'Lemon', color: 0xf0c84a, pos: [6.8, 0, AISLE], machine: [6.8, -3.9], action: 'Pour lemonade', hidden: true },
   { id: 'ice', name: 'Ice', color: 0xd5dde6, pos: [9.0, 0, AISLE], machine: [9.0, -3.9], action: 'Add ice' },
   { id: 'sanitize', name: 'Sink', color: 0x8aa0a8, pos: [11.4, 0, AISLE], machine: [11.4, -3.9], action: 'Rinse the whipper' },
+  { id: 'window', name: 'Window', color: 0xc8102e, pos: [-13.9, 0, -2.55], machine: [-14.15, -4.15], action: 'Drive-thru window' },
   { id: 'trash', name: 'Trash', color: 0x3a3d44, pos: [13.5, 0, -1.4], machine: [13.5, -1.4], action: 'Start the cup over' }
 ];
 
@@ -960,6 +962,7 @@ function buildStationBody(st, group) {
     });
     return;
   }
+  if (st.id === 'window') return;
   if (st.id === 'sanitize') {
     outlined(group, 0.95, 0.28, 0.6, 0, y + 0.12, 0, 0xc5cdd2);
     box(group, 0.55, 0.12, 0.36, 0, y + 0.28, 0, 0x8fb4c4);
@@ -1252,10 +1255,13 @@ function buildGuest(shirt) {
   return g;
 }
 
-function drinksForNewGuest() {
-  if (guestsServed < 2) return 1;
-  if (guestsServed < 4) return 2;
+function orderSize(served) {
+  if (served < 2) return 1;
+  if (served < 4) return 2;
   return 3;
+}
+function drinksForNewGuest() {
+  return orderSize(guestsServed);
 }
 
 function spawnGuest() {
@@ -1398,6 +1404,197 @@ function stepGuests(dt) {
       if (guest.patience <= 0) stormOff(guest);
     }
   }
+}
+
+// Drive-thru lane outside the window.
+const carQueue = [];
+let carsServed = 0;
+let servingDrive = false;
+let carSerial = 0;
+const CAR_COLORS = [0xc8102e, 0x2f6bff, 0xf0c84a, 0x2f9e44, 0x7a4e9a];
+const carCanvas = document.createElement('canvas');
+carCanvas.width = 420;
+carCanvas.height = 160;
+let carTex = null;
+function paintCarBubble(car) {
+  const c = carCanvas.getContext('2d');
+  c.clearRect(0, 0, 420, 160);
+  c.fillStyle = '#fffdfb';
+  canvasRoundRect(c, 8, 8, 404, 144, 40);
+  c.fill();
+  c.strokeStyle = car && car.mood === 2 ? '#d23b4a' : '#c8102e';
+  c.lineWidth = 8;
+  canvasRoundRect(c, 8, 8, 404, 144, 40);
+  c.stroke();
+  c.fillStyle = '#1c1e22';
+  c.font = '700 28px Fredoka, Trebuchet MS, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const names = (car && car.drinks.length) ? car.drinks.map((drink) => drink.name) : ['Pulling up'];
+  c.fillText(names[0] || '', 210, names.length > 1 ? 48 : 70);
+  if (names[1]) c.fillText(names.slice(1).join(' · '), 210, 96);
+  if (car && car.mood === 2) {
+    c.font = '700 26px Fredoka, Trebuchet MS, sans-serif';
+    c.fillText('Honk!', 210, 132);
+  }
+  if (carTex) carTex.needsUpdate = true;
+}
+paintCarBubble(null);
+carTex = new THREE.CanvasTexture(carCanvas);
+const carBubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: carTex, transparent: true }));
+carBubble.position.set(0, 1.7, 0);
+carBubble.scale.set(2.2, 0.9, 1);
+
+function buildCar(color) {
+  const g = new THREE.Group();
+  const bodyMat = lit(color);
+  const driverMat = lit(0xffc9a4);
+  addPart(g, new THREE.BoxGeometry(0.9, 0.42, 1.55), bodyMat, 0, 0.48, 0);
+  addPart(g, new THREE.BoxGeometry(0.7, 0.36, 0.7), lit(0xd7eef8), 0, 0.82, 0.15);
+  addPart(g, new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10), lit(0x1c1e22), 0.42, 0.2, 0.48);
+  addPart(g, new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10), lit(0x1c1e22), 0.42, 0.2, -0.48);
+  addPart(g, new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10), lit(0x1c1e22), -0.42, 0.2, 0.48);
+  addPart(g, new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10), lit(0x1c1e22), -0.42, 0.2, -0.48);
+  const head = addPart(g, new THREE.SphereGeometry(0.14, 10, 8), driverMat, 0.05, 0.84, 0.2);
+  const horn = addPart(g, new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff6ea, transparent: true, opacity: 0 }), 0.55, 0.7, -0.55);
+  g.userData = { bodyMat, driverMat, head, horn, color };
+  return g;
+}
+
+function spawnCar() {
+  if (carQueue.length >= 4) return;
+  const color = CAR_COLORS[carSerial % CAR_COLORS.length];
+  carSerial += 1;
+  const group = buildCar(color);
+  const slot = carQueue.length;
+  group.position.set(-18.2, 0, -4.2 + slot * 2.15);
+  scene.add(group);
+  const patience = 50 + slot * 16;
+  carQueue.push({
+    group: group,
+    count: orderSize(carsServed),
+    drinks: [],
+    drinkIndex: 0,
+    patience: patience,
+    maxPatience: patience,
+    mood: 0,
+    state: 'line'
+  });
+  const badge = document.getElementById('driveCount');
+  if (badge) badge.textContent = String(carQueue.length);
+}
+
+function paintCarMood(car) {
+  const ratio = car.maxPatience ? car.patience / car.maxPatience : 1;
+  car.mood = ratio < 0.28 ? 2 : ratio < 0.55 ? 1 : 0;
+  const data = car.group.userData;
+  data.driverMat.color.setHex(car.mood === 2 ? 0xf09a8c : car.mood === 1 ? 0xf0b8a4 : 0xffc9a4);
+  data.horn.material.opacity = car.mood === 2 ? 0.95 : 0;
+  if (car === carQueue[0]) paintCarBubble(car);
+}
+
+function assignCarDrinks(car) {
+  if (car.drinks.length) return;
+  for (let n = 0; n < car.count; n++) {
+    const drink = TBR.pickOrder(progress);
+    TBR.noteOrder(progress, drink.id);
+    const steps = drink.steps.map((step) => Object.assign({}, step));
+    const last = steps[steps.length - 1];
+    if (last && last.stationId === 'counter') {
+      last.stationId = 'window';
+      last.hint = 'Hand off at the window';
+      last.action = 'Hand off at the window';
+    }
+    car.drinks.push(Object.assign({}, drink, { steps: steps, name: drink.name }));
+  }
+  TBR.ensureRecords(progress);
+  paintCarBubble(car);
+}
+
+function loadCarDrink() {
+  const car = carQueue[0];
+  if (!car) return;
+  assignCarDrinks(car);
+  order = car.drinks[car.drinkIndex];
+  if (!order) return;
+  closeChoices();
+  cursor = 0;
+  orderClean = true;
+  bonusLost = false;
+  startedHintsOff = TBR.hintStage((drinkRecord().mastery) || 0) === 4;
+  ticketTimer = TBR.ORDER_SECONDS;
+  heldItem = emptyHands();
+  saveProgress();
+  updateTicketDisplay();
+  updateHeldDisplay();
+}
+
+function removeCar(car) {
+  const index = carQueue.indexOf(car);
+  if (index < 0) return;
+  if (carBubble.parent === car.group) car.group.remove(carBubble);
+  scene.remove(car.group);
+  carQueue.splice(index, 1);
+  const badge = document.getElementById('driveCount');
+  if (badge) badge.textContent = String(carQueue.length);
+  if (!carQueue.length) spawnCar();
+  if (carQueue[0] && carBubble.parent !== carQueue[0].group) carQueue[0].group.add(carBubble);
+  paintCarBubble(carQueue[0]);
+}
+
+function stormOffCar(car) {
+  if (car.state === 'leaving') return;
+  const front = carQueue[0] === car;
+  car.state = 'leaving';
+  carsServed += 1;
+  if (front && servingDrive) {
+    servingDrive = false;
+    streak = 0;
+    paintStreak();
+    bonusLost = true;
+    closeChoices();
+    heldItem = emptyHands();
+    updateHeldDisplay();
+    showAlert('The car drove off. The streak and the bonus went with them.', 'soft');
+    setTimeout(() => { if (!unlockOpen) loadCurrentDrink(); }, 400);
+  }
+  setTimeout(() => removeCar(car), 900);
+}
+
+function acceptDriveThru() {
+  const car = carQueue[0];
+  if (!car) {
+    showAlert('The lane is empty.', 'soft');
+    return;
+  }
+  servingDrive = true;
+  assignCarDrinks(car);
+  if (carBubble.parent !== car.group) car.group.add(carBubble);
+  loadCarDrink();
+  showAlert('🚗 Window order! ' + car.drinks.map((drink) => drink.name).join(' + '), true);
+}
+
+function stepCars(dt) {
+  for (let i = carQueue.length - 1; i >= 0; i--) {
+    const car = carQueue[i];
+    if (car.state === 'leaving') {
+      car.group.position.z -= 0.07;
+      if (car.group.position.z < -12) removeCar(car);
+      continue;
+    }
+    const targetZ = -4.2 + i * 2.15;
+    car.group.position.z += (targetZ - car.group.position.z) * 0.06;
+    car.group.position.x += (-18.2 - car.group.position.x) * 0.08;
+    if (!unlockOpen) {
+      car.patience -= dt * (i === 0 ? 0.9 : 0.28);
+      paintCarMood(car);
+      if (car.mood === 2) car.group.position.y = Math.abs(Math.sin(Date.now() * 0.01)) * 0.05;
+      else car.group.position.y = 0;
+      if (car.patience <= 0) stormOffCar(car);
+    }
+  }
+  const badge = document.getElementById('driveCount');
+  if (badge) badge.textContent = String(carQueue.filter((car) => car.state !== 'leaving').length);
 }
 
 // --- Orders from the real build cards ---
@@ -1790,6 +1987,12 @@ function startOrder(isFirst) {
   if (!isFirst) ticketNumber += 1;
   loadCurrentDrink();
   if (order && front) showAlert('🎫 New Order! ' + orderListLabel(front), true);
+  if (!carQueue.length) {
+    spawnCar();
+    spawnCar();
+    if (carQueue[0]) carQueue[0].group.add(carBubble);
+    paintCarBubble(carQueue[0]);
+  }
 }
 
 function completeOrder() {
@@ -1802,6 +2005,34 @@ function completeOrder() {
   revenue += result.revenue;
   document.getElementById('scoreVal').textContent = String(score);
   document.getElementById('revenueVal').textContent = revenue.toFixed(2);
+  if (servingDrive) {
+    const car = carQueue[0];
+    saveProgress();
+    if (result.perfect) showAlert('Perfect Build! Handed to the car! (+150 pts)', true);
+    else if (orderClean) showAlert('Served at the window. The time bonus already left.', 'soft');
+    else showAlert('The car took the cup.', 'soft');
+    if (maybeUnlock()) return;
+    if (!car) { servingDrive = false; setTimeout(() => loadCurrentDrink(), 400); return; }
+    car.drinkIndex += 1;
+    if (car.drinkIndex < car.drinks.length) {
+      setTimeout(() => { if (!unlockOpen && servingDrive) loadCarDrink(); }, 450);
+      return;
+    }
+    if (car.patience / car.maxPatience > 0.62 && orderClean && inTime) {
+      revenue += 1.5;
+      document.getElementById('revenueVal').textContent = revenue.toFixed(2);
+      floatPoints('Tip!');
+    }
+    car.state = 'leaving';
+    carsServed += 1;
+    servingDrive = false;
+    setTimeout(() => {
+      removeCar(car);
+      if (carQueue.length < 3) spawnCar();
+      if (!unlockOpen) loadCurrentDrink();
+    }, 800);
+    return;
+  }
   const guest = guestQueue[0];
   if (guest) {
     guest.group.position.y = 0.4;
@@ -1838,7 +2069,29 @@ function completeOrder() {
 }
 
 function interactWithStation(st) {
-  if (unlockOpen || !order) return;
+  if (unlockOpen) return;
+  if (st.id === 'window') {
+    bounceStation(st);
+    bouncePlayer();
+    const step = order && order.steps[cursor];
+    if (step && step.stationId === 'window') {
+      if (step.kind === 'simple') finishStep(step);
+      return;
+    }
+    if (!servingDrive && !heldItem.hasCup && (!order || cursor === 0)) {
+      acceptDriveThru();
+      return;
+    }
+    if (step) miss(step);
+    return;
+  }
+  if (st.id === 'counter' && servingDrive && !heldItem.hasCup && cursor === 0) {
+    servingDrive = false;
+    loadCurrentDrink();
+    showAlert('Back to the counter.', 'soft');
+    return;
+  }
+  if (!order) return;
   bounceStation(st);
   bouncePlayer();
   if (choiceOpen) return;
@@ -2106,7 +2359,7 @@ function updateFollow() {
   const aspectNow = window.innerWidth / Math.max(1, window.innerHeight);
   const portrait = aspectNow < 0.9;
   viewSize = portrait ? 8.6 : 11.5;
-  const desiredX = portrait ? playerGroup.position.x : -1.6;
+  const desiredX = portrait ? playerGroup.position.x : -3.4;
   const desiredZ = portrait ? playerGroup.position.z + 2.4 : -2.2;
   const blend = portrait ? 0.12 : 1;
   lookTarget.x += (desiredX - lookTarget.x) * blend;
@@ -2300,6 +2553,7 @@ function animate(now) {
   });
 
   if (typeof stepGuests === 'function') stepGuests(dt);
+  if (typeof stepCars === 'function') stepCars(dt);
   updateFollow();
   renderer.render(scene, camera);
 }
