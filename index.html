@@ -620,105 +620,207 @@ const stations = [
   { id: 'trash', name: 'Trash Bin', color: 0x64748b, pos: [-11, 0, 7], action: 'Dump / Reset' }
 ];
 
-// Build 3D Station Meshes with Interaction Circles
-const stationMeshes = [];
+function addPart(parent, geo, material, x, y, z) {
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addPlinth(group) {
+  addPart(group, new THREE.CylinderGeometry(1.16, 1.28, 0.58, 14), lit(0xe39a45), 0, 0.29, 0);
+  addPart(group, new THREE.CylinderGeometry(1.0, 1.0, 0.12, 14), lit(0xffe3b0), 0, 0.6, 0);
+}
+
+const labelRedraws = [];
+function addLabel(group, st) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const tex = new THREE.CanvasTexture(canvas);
+  function paint() {
+    const c = canvas.getContext('2d');
+    c.clearRect(0, 0, 512, 128);
+    c.fillStyle = '#fff8ee';
+    canvasRoundRect(c, 8, 18, 496, 92, 40);
+    c.fill();
+    const hex = '#' + st.color.toString(16).padStart(6, '0');
+    c.fillStyle = hex;
+    canvasRoundRect(c, 24, 36, 22, 56, 10);
+    c.fill();
+    c.fillStyle = '#4a2818';
+    c.font = '700 40px Fredoka, Trebuchet MS, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(st.name, 286, 66);
+    tex.needsUpdate = true;
+  }
+  paint();
+  labelRedraws.push(paint);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.position.set(0, 3.05, 0);
+  sprite.scale.set(2.65, 0.66, 1);
+  group.add(sprite);
+}
+
+function buildStationBody(st, group) {
+  if (st.id === 'cups') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.7, 0.76, 0.82, 14), lit(0xc8102e), 0, 1.12, 0);
+    for (let i = 0; i < 4; i++) {
+      addPart(group, new THREE.CylinderGeometry(0.22, 0.18, 0.16, 10), lit(0xfffdfb), 0.08, 1.62 + i * 0.15, 0.2);
+      addPart(group, new THREE.CylinderGeometry(0.2, 0.2, 0.035, 10), lit(0xc8102e), 0.08, 1.62 + i * 0.15, 0.2);
+    }
+    return;
+  }
+  if (st.id === 'dairy') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.68, 0.74, 1.55, 14), lit(0xfffdfb), 0, 1.5, 0);
+    addPart(group, new THREE.CylinderGeometry(0.7, 0.7, 0.12, 14), lit(0xc8102e), 0, 1.85, 0);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.46, 8), lit(0xf5b942), 0.48, 1.45, 0.28);
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.14, 0.48, 10), lit(0xfff3d2), 0, 1.05, 0.72);
+    addPart(group, new THREE.SphereGeometry(0.12, 8, 8), lit(0xfffdfb), 0, 1.32, 0.72);
+    return;
+  }
+  if (st.id === 'syrups') {
+    addPlinth(group);
+    const bottleColors = [0x6b3a22, 0xe39a45, 0xc8102e];
+    bottleColors.forEach((color, i) => {
+      const x = (i - 1) * 0.42;
+      addPart(group, new THREE.CylinderGeometry(0.15, 0.18, 0.88, 10), lit(color), x, 1.18, 0.08);
+      addPart(group, new THREE.SphereGeometry(0.13, 8, 8), lit(color), x, 1.5, 0.05);
+      addPart(group, new THREE.CylinderGeometry(0.04, 0.04, 0.28, 6), lit(0xfffdfb), x, 1.72, 0.05);
+      addPart(group, new THREE.SphereGeometry(0.07, 8, 6), lit(0xf5b942), x, 1.9, 0.05);
+    });
+    return;
+  }
+  if (st.id === 'lids') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.8, 0.86, 0.62, 14), lit(0x8fd4f8), 0, 1.05, 0);
+    const spots = [[0, 0.15], [-0.28, -0.05], [0.28, -0.02], [0.05, -0.22], [-0.08, 0.28]];
+    spots.forEach((spot) => {
+      addPart(group, new THREE.SphereGeometry(0.2, 10, 8), lit(0xf4fbff), spot[0], 1.42, spot[1]);
+    });
+    return;
+  }
+  if (st.id === 'javamix') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.58, 0.66, 1.7, 14), lit(0x6b3a22), 0, 1.58, 0);
+    addPart(group, new THREE.CylinderGeometry(0.64, 0.64, 0.14, 14), lit(0xc8102e), 0, 2.15, 0);
+    addPart(group, new THREE.BoxGeometry(0.5, 0.7, 0.12), lit(0xfff3d4), 0, 1.45, 0.6);
+    const nozzle = addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe8e8e8), 0, 1.15, 0.72);
+    nozzle.rotation.x = Math.PI / 2;
+    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xc8102e), 0.32, 1.85, 0.5);
+    return;
+  }
+  if (st.id === 'blender') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.55, 0.62, 0.7, 14), lit(0xf5b942), 0, 1.1, 0);
+    addPart(group, new THREE.CylinderGeometry(0.11, 0.11, 1.05, 8), lit(0xfffdfb), 0, 1.72, 0);
+    addPart(group, new THREE.CylinderGeometry(0.3, 0.34, 0.4, 12), lit(0xffd15c), 0, 2.28, 0);
+    return;
+  }
+  if (st.id === 'sanitize') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.86, 0.9, 0.42, 16), lit(0x3ecbdc), 0, 0.95, 0);
+    const water = addPart(group, new THREE.CircleGeometry(0.7, 16), lit(0x1aa8c4), 0, 1.12, 0);
+    water.rotation.x = -Math.PI / 2;
+    addPart(group, new THREE.CylinderGeometry(0.2, 0.16, 0.4, 10), lit(0xfffdfb), 0.15, 1.22, 0.15);
+    return;
+  }
+  if (st.id === 'counter') {
+    addPart(group, new THREE.CylinderGeometry(1.35, 1.45, 0.78, 16), lit(0xe39a45), 0, 0.39, 0);
+    addPart(group, new THREE.CylinderGeometry(1.2, 1.2, 0.12, 16), lit(0xffe3b0), 0, 0.8, 0);
+    const mat = addPart(group, new THREE.CircleGeometry(0.7, 18), lit(0x3cba6e), 0, 0.9, 0);
+    mat.rotation.x = -Math.PI / 2;
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.1, 10), lit(0xf5b942), 0.55, 0.95, 0.2);
+    addPart(group, new THREE.SphereGeometry(0.14, 10, 8), lit(0xf5b942), 0.55, 1.12, 0.2);
+    return;
+  }
+  addPart(group, new THREE.CylinderGeometry(0.62, 0.7, 1.05, 14), lit(0x8d95a8), 0, 0.62, 0);
+  addPart(group, new THREE.CylinderGeometry(0.68, 0.68, 0.1, 14), lit(0x5e6778), 0, 1.12, 0);
+  addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.08, 14), lit(0xd5dbe6), 0.1, 1.22, -0.02);
+}
+
 stations.forEach(st => {
   const group = new THREE.Group();
   group.position.set(st.pos[0], 0, st.pos[2]);
+  buildStationBody(st, group);
 
-  // Physical Counter / Equipment Box
-  const counterGeo = new THREE.BoxGeometry(2.4, 1.8, 1.8);
-  const counterMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
-  const counterMesh = new THREE.Mesh(counterGeo, counterMat);
-  counterMesh.position.y = 0.9;
-  counterMesh.castShadow = true;
-  counterMesh.receiveShadow = true;
-  group.add(counterMesh);
-
-  // Top Equipment Accent Piece
-  const topGeo = new THREE.BoxGeometry(1.6, 1.0, 1.2);
-  const topMat = new THREE.MeshStandardMaterial({ color: st.color, roughness: 0.3, metalness: 0.2 });
-  const topMesh = new THREE.Mesh(topGeo, topMat);
-  topMesh.position.y = 2.3;
-  topMesh.castShadow = true;
-  group.add(topMesh);
-
-  // Glowing Floor Interaction Circle
-  const ringGeo = new THREE.RingGeometry(1.6, 1.9, 32);
-  const ringMat = new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  const ringMesh = new THREE.Mesh(
+    new THREE.RingGeometry(1.45, 1.78, 28),
+    new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+  );
   ringMesh.rotation.x = -Math.PI / 2;
-  ringMesh.position.y = 0.03;
+  ringMesh.position.y = 0.035;
   group.add(ringMesh);
-
-  // Floating 3D Label
-  const canvasLabel = document.createElement('canvas');
-  canvasLabel.width = 256; canvasLabel.height = 64;
-  const lctx = canvasLabel.getContext('2d');
-  lctx.fillStyle = '#111827'; lctx.fillRect(0,0,256,64);
-  lctx.strokeStyle = '#ffffff'; lctx.lineWidth = 4; lctx.strokeRect(2,2,252,60);
-  lctx.fillStyle = '#ffffff'; lctx.font = 'bold 24px Arial'; lctx.textAlign = 'center';
-  lctx.fillText(st.name, 128, 42);
-  const labelTex = new THREE.CanvasTexture(canvasLabel);
-  const labelMat = new THREE.SpriteMaterial({ map: labelTex });
-  const labelSprite = new THREE.Sprite(labelMat);
-  labelSprite.position.set(0, 3.8, 0);
-  labelSprite.scale.set(3.2, 0.8, 1);
-  group.add(labelSprite);
+  addLabel(group, st);
 
   scene.add(group);
   st.mesh = group;
   st.ring = ringMesh;
 });
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => labelRedraws.forEach((paint) => paint()));
+}
 
-// --- Player Character (Tim Hortons Crew Member) ---
+// --- Player Character (chibi Tim Hortons crew, eyes and arms kept) ---
 const playerGroup = new THREE.Group();
 playerGroup.position.set(0, 0, 0);
+const BODY_REST_Y = 0.78;
+const skinMat = lit(0xffc9a4);
 
-// Body (Red Tim Hortons Apron)
-const bodyGeo = new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16);
-const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.6 });
+addPart(playerGroup, new THREE.CylinderGeometry(0.12, 0.14, 0.34, 8), skinMat, -0.16, 0.2, 0);
+addPart(playerGroup, new THREE.CylinderGeometry(0.12, 0.14, 0.34, 8), skinMat, 0.16, 0.2, 0);
+addPart(playerGroup, new THREE.SphereGeometry(0.14, 8, 8), lit(0x5a3018), -0.16, 0.06, 0.05);
+addPart(playerGroup, new THREE.SphereGeometry(0.14, 8, 8), lit(0x5a3018), 0.16, 0.06, 0.05);
+
+const bodyGeo = new THREE.CylinderGeometry(0.48, 0.52, 0.78, 16);
+const bodyMat = lit(0xc8102e);
 const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-bodyMesh.position.y = 1.1;
+bodyMesh.position.y = BODY_REST_Y;
 bodyMesh.castShadow = true;
 playerGroup.add(bodyMesh);
+addPart(playerGroup, new THREE.BoxGeometry(0.28, 0.16, 0.08), lit(0xfffdfb), 0, 0.58, 0.48);
 
-// Head
-const headGeo = new THREE.SphereGeometry(0.45, 16, 16);
-const headMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
-const headMesh = new THREE.Mesh(headGeo, headMat);
-headMesh.position.y = 2.15;
+const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 16), skinMat);
+headMesh.position.y = 1.58;
 headMesh.castShadow = true;
 playerGroup.add(headMesh);
 
-// Cap
-const capGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.18, 16);
-const capMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.5 });
-const capMesh = new THREE.Mesh(capGeo, capMat);
-capMesh.position.y = 2.5;
-playerGroup.add(capMesh);
+addPart(playerGroup, new THREE.CylinderGeometry(0.62, 0.62, 0.07, 16), lit(0x7a4324), 0, 1.92, 0.04);
+addPart(playerGroup, new THREE.CylinderGeometry(0.5, 0.52, 0.22, 16), lit(0x7a4324), 0, 2.08, 0);
+addPart(playerGroup, new THREE.CylinderGeometry(0.52, 0.52, 0.08, 16), lit(0xc8102e), 0, 2.0, 0);
+addPart(playerGroup, new THREE.SphereGeometry(0.09, 8, 8), lit(0xff8fa3), -0.28, 1.4, 0.4);
+addPart(playerGroup, new THREE.SphereGeometry(0.09, 8, 8), lit(0xff8fa3), 0.28, 1.4, 0.4);
+const smile = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.028, 6, 10, Math.PI), lit(0xd06a58));
+smile.position.set(0, 1.36, 0.5);
+smile.rotation.z = Math.PI;
+playerGroup.add(smile);
 
 // Eyes on the front of the head. Player faces local +Z, same as the held cup.
-const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.45 });
+const eyeWhiteMat = lit(0xffffff);
+const pupilMat = lit(0x1c1917);
 const eyeHighlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const headCenter = new THREE.Vector3(0, 2.15, 0);
+const headCenter = new THREE.Vector3(0, 1.6, 0);
 
 function addEye(side) {
   const outward = new THREE.Vector3(side * 0.2, 0.05, 0.4).normalize();
-  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.36));
+  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.5));
 
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 16), eyeWhiteMat);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), eyeWhiteMat);
   white.position.copy(center);
   playerGroup.add(white);
 
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.078, 16, 16), pupilMat);
-  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.09));
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.086, 16, 16), pupilMat);
+  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.1));
   playerGroup.add(pupil);
 
-  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.026, 16, 16), eyeHighlightMat);
-  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.125));
-  highlight.position.y += 0.04;
+  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 12), eyeHighlightMat);
+  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.14));
+  highlight.position.y += 0.045;
   highlight.position.x += side * 0.02;
   playerGroup.add(highlight);
 }
@@ -726,22 +828,22 @@ addEye(-1);
 addEye(1);
 
 // Arms hang from the shoulders. Pivots swing while walking; they stay beside the cup.
-const armMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
+const armMat = skinMat;
 const ARM_REST_X = -0.38;
 
 function addArm(side) {
   const pivot = new THREE.Group();
-  pivot.position.set(side * 0.58, 1.58, 0.08);
-  pivot.rotation.z = side * 0.28;
+  pivot.position.set(side * 0.52, 1.08, 0.1);
+  pivot.rotation.z = side * 0.42;
   pivot.rotation.x = ARM_REST_X;
 
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.68, 8), armMat);
-  arm.position.y = -0.34;
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.48, 8), armMat);
+  arm.position.y = -0.24;
   arm.castShadow = true;
   pivot.add(arm);
 
-  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 16), armMat);
-  hand.position.set(0, -0.86, 0.05);
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), armMat);
+  hand.position.set(0, -0.52, 0.04);
   hand.castShadow = true;
   pivot.add(hand);
 
@@ -751,43 +853,68 @@ function addArm(side) {
 const armPivotL = addArm(1);
 const armPivotR = addArm(-1);
 
-// Held Cup Object in Character's Hands
+// Held cup sits between the hands. Toppings are visual only.
 const heldCupGroup = new THREE.Group();
-heldCupGroup.position.set(0, 1.4, 0.9);
+heldCupGroup.position.set(0, 0.72, 0.62);
 const cupMesh = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.28, 0.22, 0.65, 12),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+  new THREE.CylinderGeometry(0.24, 0.18, 0.5, 12),
+  new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 })
 );
+cupMesh.castShadow = true;
 heldCupGroup.add(cupMesh);
+const cupBand = addPart(heldCupGroup, new THREE.CylinderGeometry(0.23, 0.23, 0.06, 12), lit(0xc8102e), 0, 0.02, 0);
+const lidTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0xd7f3ff), 0, 0.24, 0);
+const whipTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfffdfb), 0, 0.38, 0);
+lidTop.visible = false;
+whipTop.visible = false;
 heldCupGroup.visible = false;
 playerGroup.add(heldCupGroup);
 
 scene.add(playerGroup);
 
-// --- Customer NPC Character ---
+// Guest already waiting at the counter. Bubble keeps its original words.
 const customerGroup = new THREE.Group();
-customerGroup.position.set(-2, 0, 9.5); // Waiting on other side of counter
-const cBody = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-cBody.position.y = 1.1; cBody.castShadow = true;
-customerGroup.add(cBody);
-const cHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshStandardMaterial({ color: 0xfcd34d }));
-cHead.position.y = 2.15; cHead.castShadow = true;
-customerGroup.add(cHead);
+customerGroup.position.set(-2, 0, 9.5);
+addPart(customerGroup, new THREE.CylinderGeometry(0.42, 0.48, 0.7, 14), lit(0x4aa3f0), 0, 0.7, 0);
+addPart(customerGroup, new THREE.SphereGeometry(0.5, 16, 14), skinMat, 0, 1.38, 0);
+addPart(customerGroup, new THREE.SphereGeometry(0.42, 12, 10), lit(0x6b3a22), 0, 1.68, -0.02);
+addPart(customerGroup, new THREE.SphereGeometry(0.08, 8, 8), lit(0xff8fa3), -0.22, 1.28, 0.32);
+addPart(customerGroup, new THREE.SphereGeometry(0.08, 8, 8), lit(0xff8fa3), 0.22, 1.28, 0.32);
+const guestEye = lit(0x1c1917);
+addPart(customerGroup, new THREE.SphereGeometry(0.07, 8, 8), lit(0xffffff), -0.16, 1.42, 0.4);
+addPart(customerGroup, new THREE.SphereGeometry(0.07, 8, 8), lit(0xffffff), 0.16, 1.42, 0.4);
+addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, -0.16, 1.42, 0.46);
+addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, 0.16, 1.42, 0.46);
 
-// Speech Bubble over Customer
 const bubbleCanvas = document.createElement('canvas');
-bubbleCanvas.width = 256; bubbleCanvas.height = 128;
-const bctx = bubbleCanvas.getContext('2d');
-bctx.fillStyle = '#ffffff'; bctx.fillRect(0,0,256,128);
-bctx.strokeStyle = '#c8102e'; bctx.lineWidth = 6; bctx.strokeRect(4,4,248,120);
-bctx.fillStyle = '#111827'; bctx.font = 'bold 26px Arial'; bctx.textAlign = 'center';
-bctx.fillText('☕ Medium', 128, 50);
-bctx.fillText('Iced Capp', 128, 90);
-const bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
-const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex }));
-bubbleSprite.position.set(0, 3.6, 0);
-bubbleSprite.scale.set(3, 1.5, 1);
+bubbleCanvas.width = 256;
+bubbleCanvas.height = 128;
+function paintBubble() {
+  const bctx = bubbleCanvas.getContext('2d');
+  bctx.clearRect(0, 0, 256, 128);
+  bctx.fillStyle = '#fffdfb';
+  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  bctx.fill();
+  bctx.strokeStyle = '#c8102e';
+  bctx.lineWidth = 8;
+  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  bctx.stroke();
+  bctx.fillStyle = '#4a2818';
+  bctx.font = '700 30px Fredoka, Trebuchet MS, sans-serif';
+  bctx.textAlign = 'center';
+  bctx.textBaseline = 'middle';
+  bctx.fillText('☕ Medium', 128, 46);
+  bctx.fillText('Iced Capp', 128, 84);
+  if (bubbleTex) bubbleTex.needsUpdate = true;
+}
+let bubbleTex = null;
+paintBubble();
+bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
+const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, transparent: true }));
+bubbleSprite.position.set(0, 2.45, 0);
+bubbleSprite.scale.set(2.15, 1.08, 1);
 customerGroup.add(bubbleSprite);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintBubble);
 
 scene.add(customerGroup);
 
@@ -960,6 +1087,12 @@ function updateHeldDisplay() {
   else if (!heldItem.whipped) nextHint = 'Next: Go to Whipper Spindle';
   else if (!heldItem.sanitized) nextHint = 'Next: Sanitize Spindle!';
   document.getElementById('heldStatusTag').textContent = nextHint;
+
+  if (heldItem.javaMix) cupMesh.material.color.setHex(0xc68642);
+  else if (heldItem.dairy) cupMesh.material.color.setHex(0xf6e7c1);
+  else cupMesh.material.color.setHex(0xffffff);
+  lidTop.visible = !!heldItem.lid;
+  whipTop.visible = !!heldItem.whipped;
 }
 
 // Station Interaction Handlers
@@ -1116,8 +1249,9 @@ function animate() {
     const angle = Math.atan2(vx, vz);
     playerGroup.rotation.y = angle;
 
-    // Subtle run wobble
-    bodyMesh.position.y = 1.1 + Math.sin(Date.now() * 0.015) * 0.05;
+    bodyMesh.position.y = BODY_REST_Y + Math.sin(Date.now() * 0.015) * 0.05;
+  } else {
+    bodyMesh.position.y = BODY_REST_Y + Math.sin(Date.now() * 0.003) * 0.02;
   }
 
   // Visual-only arm swing. Does not change position, facing, or speed.
