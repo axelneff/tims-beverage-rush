@@ -953,6 +953,7 @@ function getRandomDrink() {
 // --- Game State & Rules ---
 let score = 0;
 let revenue = 0;
+let streak = 0;
 let ticketTimer = 35;
 let currentTicket = getRandomDrink();
 
@@ -969,7 +970,7 @@ let heldItem = {
 
 // Movement Controls
 const keys = {};
-window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; unlockAudio(); });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 // Touch / Joystick
@@ -1014,6 +1015,7 @@ const mouse = new THREE.Vector2();
 let targetPosition = null;
 
 window.addEventListener('pointerdown', e => {
+  unlockAudio();
   if (e.target.closest('#joystickZone, .hud-top, button, .use-btn, .icon-btn')) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -1030,9 +1032,11 @@ function showAlert(text, success = false) {
   alert.className = 'toast-alert' + (success ? ' success' : '');
   alert.style.display = 'block';
   setTimeout(() => { alert.style.display = 'none'; }, 2800);
+  reactToAlert(text, success);
 }
 
 function nextTicket() {
+  lastJuiceKey = '';
   currentTicket = getRandomDrink();
   heldItem = {
     hasCup: false,
@@ -1097,6 +1101,8 @@ function updateHeldDisplay() {
 
 // Station Interaction Handlers
 function interactWithStation(st) {
+  bounceStation(st);
+  bouncePlayer();
   if (st.id === 'cups') {
     if (heldItem.hasCup) {
       showAlert('You are already holding a cup!');
@@ -1204,6 +1210,211 @@ function interactWithStation(st) {
   }
 }
 
+// Juice stays out of Math.random so drink picks are unchanged.
+// Later passes can hang customers, coins, and XP off score / streak / currentTicket.
+let lastJuiceKey = '';
+let playerSquash = 0;
+const stationSquash = {};
+const lookTarget = new THREE.Vector3(0, 0, 0);
+let juiceSeed = 123456789;
+function juiceRand() {
+  juiceSeed = (juiceSeed * 1664525 + 1013904223) >>> 0;
+  return juiceSeed / 4294967296;
+}
+function bouncePlayer() { playerSquash = 1; }
+function bounceStation(st) { if (st) stationSquash[st.id] = 1; }
+
+let muted = false;
+try { muted = localStorage.getItem('tbr-muted') === '1'; } catch (err) { muted = false; }
+let audioCtx = null;
+function unlockAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, when, dur, type, gain) {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const osc = ctx.createOscillator();
+  const amp = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, when);
+  amp.gain.setValueAtTime(Math.max(0.0001, gain), when);
+  amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(amp);
+  amp.connect(ctx.destination);
+  osc.start(when);
+  osc.stop(when + dur + 0.02);
+}
+function playOk() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  tone(523.25, t, 0.08, 'sine', 0.055);
+  tone(659.25, t + 0.07, 0.1, 'sine', 0.045);
+}
+function playBad() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  tone(196, t, 0.12, 'triangle', 0.05);
+  tone(146, t + 0.08, 0.14, 'triangle', 0.04);
+}
+function playServe() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+    tone(freq, t + i * 0.07, 0.11, 'sine', 0.055);
+  });
+}
+function buzz(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (err) {}
+}
+function paintMute() {
+  const btn = document.getElementById('muteBtn');
+  if (!btn) return;
+  btn.textContent = muted ? '🔇' : '🔊';
+  btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+  btn.setAttribute('aria-label', muted ? 'Unmute sounds' : 'Mute sounds');
+}
+paintMute();
+document.getElementById('muteBtn').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  muted = !muted;
+  try { localStorage.setItem('tbr-muted', muted ? '1' : '0'); } catch (err) {}
+  paintMute();
+  if (!muted) playOk();
+});
+
+function paintStreak() {
+  const el = document.getElementById('streakVal');
+  if (el) el.textContent = String(streak);
+}
+const screenPoint = new THREE.Vector3();
+function worldToScreen(x, y, z) {
+  screenPoint.set(x, y, z).project(camera);
+  return {
+    x: (screenPoint.x * 0.5 + 0.5) * window.innerWidth,
+    y: (-screenPoint.y * 0.5 + 0.5) * window.innerHeight
+  };
+}
+function floatPoints(text) {
+  const at = worldToScreen(customerGroup.position.x, 2.1, customerGroup.position.z);
+  const el = document.createElement('div');
+  el.className = 'float-pts';
+  el.textContent = text;
+  el.style.left = at.x + 'px';
+  el.style.top = at.y + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+function burstSparkles() {
+  const at = worldToScreen(customerGroup.position.x, 1.7, customerGroup.position.z);
+  for (let i = 0; i < 14; i++) {
+    const el = document.createElement('div');
+    el.className = 'spark';
+    el.textContent = i % 2 === 0 ? '✦' : '●';
+    el.style.left = at.x + 'px';
+    el.style.top = at.y + 'px';
+    el.style.color = i % 2 === 0 ? '#ffe08a' : '#ffffff';
+    const ang = juiceRand() * Math.PI * 2;
+    const dist = 36 + juiceRand() * 86;
+    el.style.setProperty('--dx', (Math.cos(ang) * dist) + 'px');
+    el.style.setProperty('--dy', (Math.sin(ang) * dist - 24) + 'px');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 820);
+  }
+}
+function showCombo(n) {
+  const el = document.getElementById('comboPop');
+  el.textContent = n <= 1 ? 'PERFECT!' : ('STREAK ×' + n);
+  el.classList.remove('go');
+  void el.offsetWidth;
+  el.classList.add('go');
+}
+function mistakeFx() {
+  const flash = document.getElementById('flash');
+  flash.classList.remove('on');
+  void flash.offsetWidth;
+  flash.classList.add('on');
+  const wrap = document.getElementById('canvas-container');
+  wrap.classList.remove('shake');
+  void wrap.offsetWidth;
+  wrap.classList.add('shake');
+  buzz(16);
+}
+function reactToAlert(text, success) {
+  const always = text.indexOf('Perfect Build') !== -1 || text.indexOf('New Order') !== -1;
+  if (!always && text === lastJuiceKey) return;
+  lastJuiceKey = text;
+  if (text.indexOf('Perfect Build') !== -1) {
+    streak += 1;
+    paintStreak();
+    floatPoints('+150');
+    burstSparkles();
+    showCombo(streak);
+    playServe();
+    buzz([10, 40, 16]);
+    return;
+  }
+  if (text.indexOf('New Order') !== -1) {
+    const card = document.getElementById('ticketCard');
+    card.classList.remove('pop');
+    void card.offsetWidth;
+    card.classList.add('pop');
+    return;
+  }
+  if (text.indexOf('Build Card Violation') !== -1) {
+    streak = 0;
+    paintStreak();
+    mistakeFx();
+    playBad();
+    return;
+  }
+  if (!success) {
+    mistakeFx();
+    playBad();
+    return;
+  }
+  playOk();
+  buzz(8);
+}
+
+function updateFollow() {
+  const aspectNow = window.innerWidth / Math.max(1, window.innerHeight);
+  const portrait = aspectNow < 0.9;
+  viewSize = portrait ? 12 : 14;
+  const desiredX = portrait ? playerGroup.position.x + 1.8 : 0;
+  const desiredZ = portrait ? playerGroup.position.z + 1.8 : 0;
+  const blend = portrait ? 0.12 : 1;
+  lookTarget.x += (desiredX - lookTarget.x) * blend;
+  lookTarget.z += (desiredZ - lookTarget.z) * blend;
+  camera.position.set(lookTarget.x + 20, 24, lookTarget.z + 20);
+  camera.lookAt(lookTarget.x, 0, lookTarget.z);
+  camera.left = -viewSize * aspectNow;
+  camera.right = viewSize * aspectNow;
+  camera.top = viewSize;
+  camera.bottom = -viewSize;
+  camera.updateProjectionMatrix();
+}
+
+const stepRing = document.getElementById('stepRing');
+const stepRingWrap = document.getElementById('stepRingWrap');
+document.getElementById('useBtn').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!activeStation || Date.now() - lastInteractionTime <= 1100) {
+    bouncePlayer();
+    return;
+  }
+  interactWithStation(activeStation);
+  lastInteractionTime = Date.now();
+});
+
 // Main Game Animation Loop
 let activeStation = null;
 let lastInteractionTime = 0;
@@ -1274,10 +1485,14 @@ function animate() {
     }
   });
 
+  activeStation = nearbyStation;
   const promptElem = document.getElementById('promptText');
   if (nearbyStation) {
     promptElem.textContent = `STAND HERE TO: ${nearbyStation.action.toUpperCase()}`;
     promptElem.style.display = 'block';
+    if (stepRingWrap) stepRingWrap.style.display = 'block';
+    const cooled = Math.min(1, (Date.now() - lastInteractionTime) / 1100);
+    if (stepRing) stepRing.style.strokeDashoffset = String(100.5 * (1 - cooled));
 
     // Auto-trigger when standing still in circle
     if (Date.now() - lastInteractionTime > 1100) {
@@ -1286,21 +1501,36 @@ function animate() {
     }
   } else {
     promptElem.style.display = 'none';
+    if (stepRingWrap) stepRingWrap.style.display = 'none';
   }
 
+  if (playerSquash > 0) {
+    const k = Math.sin(playerSquash * Math.PI);
+    playerGroup.scale.set(1 + k * 0.12, 1 - k * 0.16, 1 + k * 0.12);
+    playerSquash = Math.max(0, playerSquash - 0.08);
+  } else if (playerGroup.scale.x !== 1) {
+    playerGroup.scale.set(1, 1, 1);
+  }
+  stations.forEach((st) => {
+    const j = stationSquash[st.id] || 0;
+    if (j > 0) {
+      const k = Math.sin(j * Math.PI);
+      st.mesh.scale.set(1 + k * 0.07, 1 - k * 0.1, 1 + k * 0.07);
+      stationSquash[st.id] = Math.max(0, j - 0.07);
+    } else if (st.mesh.scale.x !== 1) {
+      st.mesh.scale.set(1, 1, 1);
+    }
+  });
+
+  updateFollow();
   renderer.render(scene, camera);
 }
 
 // Window Resize
 function frameCamera() {
-  const aspectNow = window.innerWidth / window.innerHeight;
-  camera.left = -viewSize * aspectNow;
-  camera.right = viewSize * aspectNow;
-  camera.top = viewSize;
-  camera.bottom = -viewSize;
-  camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updateFollow();
 }
 window.addEventListener('resize', frameCamera);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', frameCamera);
