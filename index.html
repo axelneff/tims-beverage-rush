@@ -2,22 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Tim Hortons — Arcade Bakery & Beverage Rush</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#c8102e" />
+<title>Tim Hortons Beverage Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
     --tim-red: #c8102e;
-    --tim-dark: #1f2937;
-    --tim-gold: #f59e0b;
+    --tim-red-dark: #8e0c22;
+    --tim-brown: #6f3b22;
+    --tim-ink: #4a2818;
+    --tim-gold: #f5b942;
+    --tim-cream: #fff6ea;
+    --font: "Fredoka", "Trebuchet MS", "Segoe UI Rounded", "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; }
   body {
-    background: #f9f5f0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #ffe7c2;
+    font-family: var(--font);
+    color: var(--tim-ink);
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     position: relative;
+    touch-action: none;
   }
 
   #canvas-container {
@@ -27,178 +39,347 @@
     top: 0; left: 0;
     z-index: 1;
   }
+  #flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(200, 16, 46, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 12;
+  }
+  #flash.on { animation: mistakeFlash 0.42s ease; }
+  @keyframes mistakeFlash { 0% { opacity: 0.72; } 100% { opacity: 0; } }
+  #canvas-container.shake { animation: screenShake 0.38s linear; }
+  @keyframes screenShake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-5px, 2px); }
+    40% { transform: translate(5px, -2px); }
+    60% { transform: translate(-3px, -2px); }
+    80% { transform: translate(3px, 2px); }
+  }
 
-  /* HUD Overlay */
   .hud-top {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    z-index: 10;
-    pointer-events: none;
-  }
-  .hud-badge {
-    background: rgba(17, 24, 39, 0.85);
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 24px;
-    font-weight: 800;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    backdrop-filter: blur(4px);
-  }
-  .hud-brand {
-    background: var(--tim-red);
-    color: white;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    border: 2px solid #ef4444;
-  }
-
-  /* Current Active Order Ticket */
-  .active-ticket {
-    position: absolute;
-    top: 64px;
-    left: 12px;
-    background: #fffdf5;
-    border-top: 6px solid var(--tim-red);
-    border-radius: 8px;
-    padding: 12px 14px;
-    width: 250px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-    z-index: 10;
-    pointer-events: none;
-    transition: transform 0.2s;
-  }
-  .ticket-label { font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; }
-  .ticket-name { font-size: 16px; font-weight: 900; color: #111827; margin: 2px 0 4px; }
-  .ticket-steps { font-size: 11px; color: #4b5563; line-height: 1.4; }
-  .patience-bar {
-    width: 100%;
-    height: 6px;
-    background: #e5e7eb;
-    border-radius: 3px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .patience-fill {
-    width: 100%;
-    height: 100%;
-    background: #10b981;
-    transition: width 0.1s linear, background-color 0.3s;
-  }
-
-  /* Bottom Controls & Action Prompts */
-  .hud-bottom {
-    position: absolute;
-    bottom: 20px;
-    left: 0; right: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     z-index: 10;
     pointer-events: none;
   }
-  .interaction-prompt {
-    background: rgba(17, 24, 39, 0.9);
-    border: 2px solid var(--tim-gold);
-    color: white;
-    padding: 8px 20px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 800;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    display: none;
-    animation: pulse 1s infinite alternate;
+  .brand-lockup { display: flex; align-items: center; gap: 8px; }
+  .hud-badge, .hud-brand, .icon-btn, .use-btn, .active-ticket, .held-item-card, .interaction-prompt {
+    font-family: var(--font);
   }
-  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
-
-  .held-item-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-    font-size: 13px;
-    font-weight: 800;
-    color: #1f2937;
-  }
-  .held-tag {
-    background: #f3f4f6;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    color: #4b5563;
-  }
-
-  /* Toast Notification */
-  .toast-alert {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ef4444;
-    color: white;
-    padding: 10px 24px;
-    border-radius: 24px;
-    font-weight: 800;
-    font-size: 14px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    z-index: 20;
-    display: none;
-    text-align: center;
-    max-width: 90%;
-  }
-  .toast-alert.success { background: #10b981; }
-
-  /* Virtual Joystick for Mobile Touch */
-  .joystick-zone {
-    position: absolute;
-    bottom: 24px;
-    left: 24px;
-    width: 110px;
-    height: 110px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    z-index: 10;
+  .hud-badge {
+    background: linear-gradient(#fffdf9, #fff1d6);
+    border: 3px solid #fff;
+    color: var(--tim-ink);
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 15px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 0 #e7c08a, 0 8px 14px rgba(90, 40, 10, 0.12);
+    min-height: 42px;
   }
-  .joystick-knob {
-    width: 44px;
-    height: 44px;
-    background: white;
+  .hud-badge b { font-weight: 700; }
+  .stat-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .hud-brand {
+    background: linear-gradient(#e31b3c, var(--tim-red));
+    color: white;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 16px;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 0 var(--tim-red-dark);
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+  }
+  .icon-btn, .use-btn {
+    pointer-events: auto;
+    border: 3px solid #fff;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .icon-btn {
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    position: absolute;
+    background: linear-gradient(#fffdf9, #ffe7bf);
+    box-shadow: 0 4px 0 #e7c08a;
+    font-size: 20px;
   }
-  .controls-help {
+  .icon-btn:active, .use-btn:active { transform: translateY(3px); }
+
+  .active-ticket {
     position: absolute;
-    bottom: 12px;
-    right: 14px;
-    background: rgba(17, 24, 39, 0.7);
-    color: #9ca3af;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
+    top: 78px;
+    left: calc(12px + env(safe-area-inset-left));
+    background: linear-gradient(#fffdfb, #fff3df);
+    border: 4px solid #fff;
+    border-radius: 26px;
+    padding: 12px 14px 12px;
+    width: min(320px, calc(100vw - 24px));
+    box-shadow: 0 6px 0 #e8b56a, 0 14px 24px rgba(90, 40, 10, 0.16);
     z-index: 10;
     pointer-events: none;
+  }
+  .active-ticket.pop { animation: ticketPop 0.45s ease; }
+  @keyframes ticketPop {
+    0% { transform: scale(0.92); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .ticket-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tim-red);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .ticket-name { font-size: 22px; font-weight: 700; color: var(--tim-ink); margin: 2px 0 6px; line-height: 1.15; }
+  .ticket-steps { font-size: 14px; color: #6a4632; line-height: 1.45; font-weight: 500; }
+  .patience-bar {
+    width: 100%;
+    height: 12px;
+    background: #f3ddc0;
+    border-radius: 999px;
+    margin-top: 10px;
+    overflow: hidden;
+    border: 2px solid #fff;
+  }
+  .patience-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #7ddea8, #2fbe73);
+    border-radius: 999px;
+    transition: width 0.1s linear, background-color 0.3s;
+  }
+
+  .hud-bottom {
+    position: absolute;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 140px;
+    right: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .prompt-row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+  .step-ring { width: 46px; height: 46px; flex: 0 0 auto; filter: drop-shadow(0 3px 0 rgba(111, 59, 34, 0.18)); }
+  .ring-track { fill: none; stroke: #fff; stroke-width: 5; }
+  .ring-value {
+    fill: none;
+    stroke: var(--tim-red);
+    stroke-width: 5;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 20px 20px;
+    stroke-dasharray: 100.5;
+    stroke-dashoffset: 100.5;
+  }
+  .interaction-prompt {
+    background: linear-gradient(#fffdf9, #fff0d0);
+    border: 3px solid #fff;
+    color: var(--tim-ink);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 4px 0 #e7c08a;
+    display: none;
+    animation: pulse 1s infinite alternate;
+    text-align: center;
+  }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+
+  .held-item-card {
+    background: linear-gradient(#fffdfb, #fff1d8);
+    border: 3px solid #fff;
+    border-radius: 20px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 0 #e7c08a;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tim-ink);
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .held-tag {
+    background: #ffe1ea;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--tim-red-dark);
+    font-weight: 700;
+  }
+
+  .toast-alert {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--tim-red);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 22px;
+    border: 3px solid #fff;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 5px 0 var(--tim-red-dark);
+    z-index: 20;
+    display: none;
+    text-align: center;
+    max-width: min(520px, 92vw);
+    line-height: 1.3;
+  }
+  .toast-alert.success { background: #1faa62; box-shadow: 0 5px 0 #127a43; }
+
+  .joystick-zone {
+    position: absolute;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: calc(14px + env(safe-area-inset-left));
+    width: 118px;
+    height: 118px;
+    background: rgba(255, 250, 244, 0.86);
+    border: 4px solid rgba(200, 16, 46, 0.72);
+    border-radius: 50%;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 0 rgba(111, 59, 34, 0.16), inset 0 0 0 10px rgba(255, 228, 196, 0.95);
+    touch-action: none;
+  }
+  .joystick-knob {
+    width: 52px;
+    height: 52px;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #ffd98a);
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 0 #e0b15f;
+    position: absolute;
+  }
+  .use-btn {
+    position: absolute;
+    right: calc(14px + env(safe-area-inset-right));
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #ff617c, #c8102e 62%, #9d0d24);
+    color: white;
+    font-size: 18px;
+    letter-spacing: 0.4px;
+    box-shadow: 0 6px 0 #7d1024;
+    z-index: 11;
+  }
+  .controls-help {
+    position: static;
+    margin-top: 8px;
+    background: transparent;
+    color: #8a5a40;
+    padding: 0;
+    border: 0;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    transform: none;
+  }
+  .combo-pop {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font);
+    font-size: 48px;
+    font-weight: 700;
+    color: #fff8ea;
+    -webkit-text-stroke: 8px var(--tim-red);
+    paint-order: stroke fill;
+    text-shadow: 0 6px 0 #8e0c22;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 30;
+    white-space: nowrap;
+  }
+.combo-pop.go { opacity: 1; animation: comboPop 1.7s ease; }
+@keyframes comboPop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.55); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+  70% { opacity: 1; transform: translate(-50%, -56%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(0.94); }
+}
+  .float-pts {
+    position: absolute;
+    z-index: 28;
+    pointer-events: none;
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: 28px;
+    color: #fff;
+    -webkit-text-stroke: 5px #e39b14;
+    paint-order: stroke fill;
+    opacity: 1;
+    animation: floatUp 1.15s ease forwards;
+  }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
+    20% { opacity: 1; transform: translate(-50%, -8px) scale(1.08); }
+    100% { opacity: 0; transform: translate(-50%, -72px) scale(1); }
+  }
+  .spark {
+    position: absolute;
+    z-index: 27;
+    pointer-events: none;
+    font-size: 22px;
+    animation: sparkFly 0.8s ease-out forwards;
+  }
+  @keyframes sparkFly {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1); }
+  }
+
+  @media (max-width: 860px), (max-aspect-ratio: 4/5) {
+    .hud-top { flex-direction: column; align-items: stretch; gap: 8px; }
+    .brand-lockup { justify-content: space-between; }
+    .stat-row { justify-content: stretch; }
+    .stat-row .hud-badge { flex: 1; min-width: 0; padding: 6px 6px; font-size: 14px; }
+    .active-ticket {
+      top: auto;
+      bottom: calc(120px + env(safe-area-inset-bottom));
+      left: 10px;
+      right: 10px;
+      width: auto;
+    }
+    .ticket-name { font-size: 18px; }
+    .ticket-steps { font-size: 13px; }
+    .hud-bottom {
+      left: 12px;
+      right: 12px;
+      bottom: calc(340px + env(safe-area-inset-bottom));
+    }
+    .toast-alert { top: calc(118px + env(safe-area-inset-top)); }
+    .use-btn { width: 78px; height: 78px; }
+    .joystick-zone { width: 108px; height: 108px; }
+    .combo-pop { font-size: 36px; -webkit-text-stroke-width: 6px; }
   }
 </style>
 <script src="three.min.js"></script>
@@ -206,121 +387,226 @@
 <body>
 
 <div id="canvas-container"></div>
+<div id="flash"></div>
 
-<!-- HUD Top -->
 <div class="hud-top">
-  <div class="hud-brand">☕ TIM HORTONS 3D</div>
-  <div style="display:flex; gap:10px;">
-    <div class="hud-badge">⭐ Score: <span id="scoreVal" style="color:var(--tim-gold);">0</span></div>
-    <div class="hud-badge">💵 Revenue: $<span id="revenueVal">0</span></div>
+  <div class="brand-lockup">
+    <div class="hud-brand">☕ Tim Hortons</div>
+    <button type="button" id="muteBtn" class="icon-btn" aria-label="Mute sounds" aria-pressed="false">🔊</button>
+  </div>
+  <div class="stat-row">
+    <div class="hud-badge" title="Score">⭐ <b id="scoreVal">0</b></div>
+    <div class="hud-badge" title="Streak">🔥 <b id="streakVal">0</b></div>
+    <div class="hud-badge" title="Order timer">⏱ <b id="timerVal">0:35</b></div>
+    <div class="hud-badge" title="Revenue">💵 $<b id="revenueVal">0</b></div>
   </div>
 </div>
 
-<!-- Active Customer Ticket -->
 <div class="active-ticket" id="ticketCard">
-  <div class="ticket-label">Customer Order #<span id="ticketId">1</span></div>
+  <div class="ticket-label">Order #<span id="ticketId">1</span></div>
   <div class="ticket-name" id="ticketTitle">Medium Iced Capp</div>
   <div class="ticket-steps" id="ticketSteps">1. Medium Cup → 2. Cream L1 → 3. Dome Lid → 4. Java Mix L4 → 5. Whip 15s → 6. Sanitize Spindle</div>
   <div class="patience-bar">
     <div class="patience-fill" id="patienceFill"></div>
   </div>
+  <div class="controls-help">
+    Stick, WASD, or a tap on the floor to walk. Stand in a ring, or press USE, to work the station.
+  </div>
 </div>
 
-<!-- Center Alert Banner -->
 <div class="toast-alert" id="toastAlert">Wrong sequence! Check build card.</div>
+<div class="combo-pop" id="comboPop"></div>
 
-<!-- Bottom Prompt / Item Tracker -->
 <div class="hud-bottom">
-  <div class="interaction-prompt" id="promptText">PRESS SPACE OR STAND TO INTERACT</div>
+  <div class="prompt-row">
+    <svg id="stepRingWrap" class="step-ring" viewBox="0 0 40 40" style="display:none" aria-hidden="true">
+      <circle class="ring-track" cx="20" cy="20" r="16"></circle>
+      <circle id="stepRing" class="ring-value" cx="20" cy="20" r="16"></circle>
+    </svg>
+    <div class="interaction-prompt" id="promptText">WALK TO A GLOWING RING</div>
+  </div>
   <div class="held-item-card" id="heldCard" style="display:none;">
-    <span>Holding:</span>
+    <span>Holding</span>
     <span id="heldItemTitle" style="color:var(--tim-red);">Empty Hands</span>
     <span class="held-tag" id="heldStatusTag">Stand near Cups</span>
   </div>
 </div>
 
-<!-- Mobile Touch Joystick -->
 <div class="joystick-zone" id="joystickZone">
   <div class="joystick-knob" id="joystickKnob"></div>
 </div>
-
-<div class="controls-help">
-  Controls: <strong>WASD / Arrow Keys</strong> to walk | <strong>Click floor</strong> to move
-</div>
+<button type="button" id="useBtn" class="use-btn">USE</button>
 
 <script>
 // --- Three.js Isometric Game Scene ---
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf9f5f0); // Warm cafe color
+scene.background = new THREE.Color(0xfff1dc);
 
-// Isometric Camera
+// Isometric Camera. viewSize is updated for portrait in the resize handler.
 const aspect = window.innerWidth / window.innerHeight;
-const d = 14;
-const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+let viewSize = 14;
+const camera = new THREE.OrthographicCamera(-viewSize * aspect, viewSize * aspect, viewSize, -viewSize, 1, 1000);
 camera.position.set(20, 24, 20);
 camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.8); // Warm cafe lighting
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(0xffdbac, 0.9); // Golden cafe light
-dirLight.position.set(15, 30, 10);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-dirLight.shadow.camera.near = 5;
-dirLight.shadow.camera.far = 60;
-dirLight.shadow.camera.left = -18;
-dirLight.shadow.camera.right = 18;
-dirLight.shadow.camera.top = 18;
-dirLight.shadow.camera.bottom = -18;
-scene.add(dirLight);
-
-// Restaurant Floor (Checkerboard pattern)
-const floorGeo = new THREE.PlaneGeometry(28, 22);
-const floorCanvas = document.createElement('canvas');
-floorCanvas.width = 256; floorCanvas.height = 256;
-const ctx = floorCanvas.getContext('2d');
-ctx.fillStyle = '#d4a574'; ctx.fillRect(0, 0, 256, 256); // Warm tan
-ctx.fillStyle = '#c9945c'; // Darker tan
-for(let i=0; i<4; i++){
-  for(let j=0; j<4; j++){
-    if((i+j)%2===0) ctx.fillRect(i*64, j*64, 64, 64);
-  }
+function lit(color) {
+  return new THREE.MeshLambertMaterial({ color: color });
 }
+
+// Soft bakery light: warm sky, wood-colored bounce, one shadow-casting sun.
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0xf0c48a, 0.62));
+scene.add(new THREE.AmbientLight(0xfff4e6, 0.38));
+const dirLight = new THREE.DirectionalLight(0xfff7ec, 0.78);
+dirLight.position.set(12, 22, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 1024;
+dirLight.shadow.mapSize.height = 1024;
+dirLight.shadow.bias = -0.0012;
+dirLight.shadow.camera.near = 4;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -22;
+dirLight.shadow.camera.right = 22;
+dirLight.shadow.camera.top = 22;
+dirLight.shadow.camera.bottom = -22;
+scene.add(dirLight);
+scene.add(dirLight.target);
+
+function canvasRoundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+// Warm square tiles with soft grout. One tile, repeated.
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = 128;
+floorCanvas.height = 128;
+const fctx = floorCanvas.getContext('2d');
+fctx.fillStyle = '#e7b56a';
+fctx.fillRect(0, 0, 128, 128);
+fctx.fillStyle = '#ffc56d';
+canvasRoundRect(fctx, 8, 8, 112, 112, 16);
+fctx.fill();
+fctx.fillStyle = '#ffd892';
+canvasRoundRect(fctx, 18, 18, 52, 52, 12);
+fctx.fill();
 const floorTex = new THREE.CanvasTexture(floorCanvas);
-floorTex.repeat.set(7, 5.5);
+floorTex.repeat.set(10, 8);
 floorTex.wrapS = THREE.RepeatWrapping;
 floorTex.wrapT = THREE.RepeatWrapping;
-const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 });
-const floor = new THREE.Mesh(floorGeo, floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 22), new THREE.MeshLambertMaterial({ map: floorTex }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Back & Side Walls with Tim Hortons Branding Red Stripe
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5e6d3, roughness: 0.85 }); // Cream walls
-const stripeMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.5 });
+const rug = new THREE.Mesh(new THREE.CircleGeometry(2.7, 24), lit(0xf0b15a));
+rug.rotation.x = -Math.PI / 2;
+rug.position.set(0, 0.015, 0.2);
+rug.receiveShadow = true;
+scene.add(rug);
 
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6, 0.6), wallMat);
-backWall.position.set(0, 3, -11);
+// Cream walls, wood wainscot, Tims red stripe.
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 6.5, 0.42), lit(0xfff6ea));
+backWall.position.set(0, 3.25, -11);
+backWall.receiveShadow = true;
 scene.add(backWall);
-
-const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 0.7), stripeMat);
-backStripe.position.set(0, 4.5, -11);
+const backWood = new THREE.Mesh(new THREE.BoxGeometry(28, 1.65, 0.56), lit(0xe39a45));
+backWood.position.set(0, 0.82, -10.95);
+backWood.receiveShadow = true;
+scene.add(backWood);
+const backStripe = new THREE.Mesh(new THREE.BoxGeometry(28, 0.46, 0.64), lit(0xc8102e));
+backStripe.position.set(0, 4.85, -10.9);
 scene.add(backStripe);
 
-const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 22), wallMat);
-leftWall.position.set(-14, 3, 0);
+const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.42, 6.5, 22), lit(0xfff6ea));
+leftWall.position.set(-14, 3.25, 0);
+leftWall.receiveShadow = true;
 scene.add(leftWall);
+const leftWood = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.65, 22), lit(0xe39a45));
+leftWood.position.set(-13.95, 0.82, 0);
+scene.add(leftWood);
+
+const signCanvas = document.createElement('canvas');
+signCanvas.width = 768;
+signCanvas.height = 180;
+function paintSign() {
+  const c = signCanvas.getContext('2d');
+  c.clearRect(0, 0, 768, 180);
+  c.fillStyle = '#c8102e';
+  canvasRoundRect(c, 8, 8, 752, 164, 48);
+  c.fill();
+  c.fillStyle = '#fff8ee';
+  c.font = '700 72px Fredoka, Trebuchet MS, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('Tim Hortons', 384, 96);
+  if (signTex) signTex.needsUpdate = true;
+}
+let signTex = null;
+paintSign();
+signTex = new THREE.CanvasTexture(signCanvas);
+const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.5), new THREE.MeshBasicMaterial({ map: signTex }));
+sign.position.set(-1.2, 5.35, -10.68);
+scene.add(sign);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(paintSign);
+}
+
+const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(3.1, 2.15, 0.2), lit(0x7a4324));
+windowFrame.position.set(8.4, 3.55, -10.7);
+scene.add(windowFrame);
+const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.6), lit(0x8fd4ff));
+windowPane.position.set(8.4, 3.55, -10.55);
+scene.add(windowPane);
+const windowShine = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.15), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+windowShine.position.set(7.7, 3.7, -10.52);
+scene.add(windowShine);
+
+for (let i = 0; i < 8; i++) {
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 7), i % 2 === 0 ? lit(0xc8102e) : lit(0xfff6ea));
+  flag.position.set(-7 + i * 2, 5.45, -10.62);
+  flag.rotation.x = Math.PI;
+  scene.add(flag);
+}
+
+function addLamp(x, z) {
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), lit(0x7a4324));
+  cord.position.set(x, 5.7, z);
+  scene.add(cord);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), lit(0xfff3c4));
+  bulb.position.set(x, 5.15, z);
+  scene.add(bulb);
+}
+addLamp(-5.5, -6.2);
+addLamp(4.2, -5.4);
+
+function addPlant(x, z) {
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.46, 10), lit(0xc8102e));
+  pot.position.set(x, 0.23, z);
+  pot.castShadow = true;
+  scene.add(pot);
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 8), lit(0x3fae55));
+  leaf.position.set(x, 0.78, z);
+  leaf.castShadow = true;
+  scene.add(leaf);
+  const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lit(0x7ed37a));
+  sprout.position.set(x + 0.18, 1.05, z + 0.08);
+  scene.add(sprout);
+}
+addPlant(-12.3, -9.1);
+addPlant(12.3, -8.6);
 
 // --- Stations Definition ---
 const stations = [
@@ -335,105 +621,207 @@ const stations = [
   { id: 'trash', name: 'Trash Bin', color: 0x64748b, pos: [-11, 0, 7], action: 'Dump / Reset' }
 ];
 
-// Build 3D Station Meshes with Interaction Circles
-const stationMeshes = [];
+function addPart(parent, geo, material, x, y, z) {
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addPlinth(group) {
+  addPart(group, new THREE.CylinderGeometry(1.16, 1.28, 0.58, 14), lit(0xe39a45), 0, 0.29, 0);
+  addPart(group, new THREE.CylinderGeometry(1.0, 1.0, 0.12, 14), lit(0xffe3b0), 0, 0.6, 0);
+}
+
+const labelRedraws = [];
+function addLabel(group, st) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const tex = new THREE.CanvasTexture(canvas);
+  function paint() {
+    const c = canvas.getContext('2d');
+    c.clearRect(0, 0, 512, 128);
+    c.fillStyle = '#fff8ee';
+    canvasRoundRect(c, 8, 18, 496, 92, 40);
+    c.fill();
+    const hex = '#' + st.color.toString(16).padStart(6, '0');
+    c.fillStyle = hex;
+    canvasRoundRect(c, 24, 36, 22, 56, 10);
+    c.fill();
+    c.fillStyle = '#4a2818';
+    c.font = '700 40px Fredoka, Trebuchet MS, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(st.name, 286, 66);
+    tex.needsUpdate = true;
+  }
+  paint();
+  labelRedraws.push(paint);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.position.set(0, 3.05, 0);
+  sprite.scale.set(2.65, 0.66, 1);
+  group.add(sprite);
+}
+
+function buildStationBody(st, group) {
+  if (st.id === 'cups') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.7, 0.76, 0.82, 14), lit(0xc8102e), 0, 1.12, 0);
+    for (let i = 0; i < 4; i++) {
+      addPart(group, new THREE.CylinderGeometry(0.22, 0.18, 0.16, 10), lit(0xfffdfb), 0.08, 1.62 + i * 0.15, 0.2);
+      addPart(group, new THREE.CylinderGeometry(0.2, 0.2, 0.035, 10), lit(0xc8102e), 0.08, 1.62 + i * 0.15, 0.2);
+    }
+    return;
+  }
+  if (st.id === 'dairy') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.68, 0.74, 1.55, 14), lit(0xfffdfb), 0, 1.5, 0);
+    addPart(group, new THREE.CylinderGeometry(0.7, 0.7, 0.12, 14), lit(0xc8102e), 0, 1.85, 0);
+    addPart(group, new THREE.CylinderGeometry(0.05, 0.05, 0.46, 8), lit(0xf5b942), 0.48, 1.45, 0.28);
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.14, 0.48, 10), lit(0xfff3d2), 0, 1.05, 0.72);
+    addPart(group, new THREE.SphereGeometry(0.12, 8, 8), lit(0xfffdfb), 0, 1.32, 0.72);
+    return;
+  }
+  if (st.id === 'syrups') {
+    addPlinth(group);
+    const bottleColors = [0x6b3a22, 0xe39a45, 0xc8102e];
+    bottleColors.forEach((color, i) => {
+      const x = (i - 1) * 0.42;
+      addPart(group, new THREE.CylinderGeometry(0.15, 0.18, 0.88, 10), lit(color), x, 1.18, 0.08);
+      addPart(group, new THREE.SphereGeometry(0.13, 8, 8), lit(color), x, 1.5, 0.05);
+      addPart(group, new THREE.CylinderGeometry(0.04, 0.04, 0.28, 6), lit(0xfffdfb), x, 1.72, 0.05);
+      addPart(group, new THREE.SphereGeometry(0.07, 8, 6), lit(0xf5b942), x, 1.9, 0.05);
+    });
+    return;
+  }
+  if (st.id === 'lids') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.8, 0.86, 0.62, 14), lit(0x8fd4f8), 0, 1.05, 0);
+    const spots = [[0, 0.15], [-0.28, -0.05], [0.28, -0.02], [0.05, -0.22], [-0.08, 0.28]];
+    spots.forEach((spot) => {
+      addPart(group, new THREE.SphereGeometry(0.2, 10, 8), lit(0xf4fbff), spot[0], 1.42, spot[1]);
+    });
+    return;
+  }
+  if (st.id === 'javamix') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.58, 0.66, 1.7, 14), lit(0x6b3a22), 0, 1.58, 0);
+    addPart(group, new THREE.CylinderGeometry(0.64, 0.64, 0.14, 14), lit(0xc8102e), 0, 2.15, 0);
+    addPart(group, new THREE.BoxGeometry(0.5, 0.7, 0.12), lit(0xfff3d4), 0, 1.45, 0.6);
+    const nozzle = addPart(group, new THREE.CylinderGeometry(0.08, 0.1, 0.28, 8), lit(0xe8e8e8), 0, 1.15, 0.72);
+    nozzle.rotation.x = Math.PI / 2;
+    addPart(group, new THREE.SphereGeometry(0.1, 8, 8), lit(0xc8102e), 0.32, 1.85, 0.5);
+    return;
+  }
+  if (st.id === 'blender') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.55, 0.62, 0.7, 14), lit(0xf5b942), 0, 1.1, 0);
+    addPart(group, new THREE.CylinderGeometry(0.11, 0.11, 1.05, 8), lit(0xfffdfb), 0, 1.72, 0);
+    addPart(group, new THREE.CylinderGeometry(0.3, 0.34, 0.4, 12), lit(0xffd15c), 0, 2.28, 0);
+    return;
+  }
+  if (st.id === 'sanitize') {
+    addPlinth(group);
+    addPart(group, new THREE.CylinderGeometry(0.86, 0.9, 0.42, 16), lit(0x3ecbdc), 0, 0.95, 0);
+    const water = addPart(group, new THREE.CircleGeometry(0.7, 16), lit(0x1aa8c4), 0, 1.12, 0);
+    water.rotation.x = -Math.PI / 2;
+    addPart(group, new THREE.CylinderGeometry(0.2, 0.16, 0.4, 10), lit(0xfffdfb), 0.15, 1.22, 0.15);
+    return;
+  }
+  if (st.id === 'counter') {
+    addPart(group, new THREE.CylinderGeometry(1.35, 1.45, 0.78, 16), lit(0xe39a45), 0, 0.39, 0);
+    addPart(group, new THREE.CylinderGeometry(1.2, 1.2, 0.12, 16), lit(0xffe3b0), 0, 0.8, 0);
+    const mat = addPart(group, new THREE.CircleGeometry(0.7, 18), lit(0x3cba6e), 0, 0.9, 0);
+    mat.rotation.x = -Math.PI / 2;
+    addPart(group, new THREE.CylinderGeometry(0.16, 0.18, 0.1, 10), lit(0xf5b942), 0.55, 0.95, 0.2);
+    addPart(group, new THREE.SphereGeometry(0.14, 10, 8), lit(0xf5b942), 0.55, 1.12, 0.2);
+    return;
+  }
+  addPart(group, new THREE.CylinderGeometry(0.62, 0.7, 1.05, 14), lit(0x8d95a8), 0, 0.62, 0);
+  addPart(group, new THREE.CylinderGeometry(0.68, 0.68, 0.1, 14), lit(0x5e6778), 0, 1.12, 0);
+  addPart(group, new THREE.CylinderGeometry(0.5, 0.5, 0.08, 14), lit(0xd5dbe6), 0.1, 1.22, -0.02);
+}
+
 stations.forEach(st => {
   const group = new THREE.Group();
   group.position.set(st.pos[0], 0, st.pos[2]);
+  buildStationBody(st, group);
 
-  // Physical Counter / Equipment Box
-  const counterGeo = new THREE.BoxGeometry(2.4, 1.8, 1.8);
-  const counterMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
-  const counterMesh = new THREE.Mesh(counterGeo, counterMat);
-  counterMesh.position.y = 0.9;
-  counterMesh.castShadow = true;
-  counterMesh.receiveShadow = true;
-  group.add(counterMesh);
-
-  // Top Equipment Accent Piece
-  const topGeo = new THREE.BoxGeometry(1.6, 1.0, 1.2);
-  const topMat = new THREE.MeshStandardMaterial({ color: st.color, roughness: 0.3, metalness: 0.2 });
-  const topMesh = new THREE.Mesh(topGeo, topMat);
-  topMesh.position.y = 2.3;
-  topMesh.castShadow = true;
-  group.add(topMesh);
-
-  // Glowing Floor Interaction Circle
-  const ringGeo = new THREE.RingGeometry(1.6, 1.9, 32);
-  const ringMat = new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  const ringMesh = new THREE.Mesh(
+    new THREE.RingGeometry(1.45, 1.78, 28),
+    new THREE.MeshBasicMaterial({ color: st.color, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+  );
   ringMesh.rotation.x = -Math.PI / 2;
-  ringMesh.position.y = 0.03;
+  ringMesh.position.y = 0.035;
   group.add(ringMesh);
-
-  // Floating 3D Label
-  const canvasLabel = document.createElement('canvas');
-  canvasLabel.width = 256; canvasLabel.height = 64;
-  const lctx = canvasLabel.getContext('2d');
-  lctx.fillStyle = '#111827'; lctx.fillRect(0,0,256,64);
-  lctx.strokeStyle = '#ffffff'; lctx.lineWidth = 4; lctx.strokeRect(2,2,252,60);
-  lctx.fillStyle = '#ffffff'; lctx.font = 'bold 24px Arial'; lctx.textAlign = 'center';
-  lctx.fillText(st.name, 128, 42);
-  const labelTex = new THREE.CanvasTexture(canvasLabel);
-  const labelMat = new THREE.SpriteMaterial({ map: labelTex });
-  const labelSprite = new THREE.Sprite(labelMat);
-  labelSprite.position.set(0, 3.8, 0);
-  labelSprite.scale.set(3.2, 0.8, 1);
-  group.add(labelSprite);
+  addLabel(group, st);
 
   scene.add(group);
   st.mesh = group;
   st.ring = ringMesh;
 });
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => labelRedraws.forEach((paint) => paint()));
+}
 
-// --- Player Character (Tim Hortons Crew Member) ---
+// --- Player Character (chibi Tim Hortons crew, eyes and arms kept) ---
 const playerGroup = new THREE.Group();
 playerGroup.position.set(0, 0, 0);
+const BODY_REST_Y = 0.78;
+const skinMat = lit(0xffc9a4);
 
-// Body (Red Tim Hortons Apron)
-const bodyGeo = new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16);
-const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.6 });
+addPart(playerGroup, new THREE.CylinderGeometry(0.12, 0.14, 0.34, 8), skinMat, -0.16, 0.2, 0);
+addPart(playerGroup, new THREE.CylinderGeometry(0.12, 0.14, 0.34, 8), skinMat, 0.16, 0.2, 0);
+addPart(playerGroup, new THREE.SphereGeometry(0.14, 8, 8), lit(0x5a3018), -0.16, 0.06, 0.05);
+addPart(playerGroup, new THREE.SphereGeometry(0.14, 8, 8), lit(0x5a3018), 0.16, 0.06, 0.05);
+
+const bodyGeo = new THREE.CylinderGeometry(0.48, 0.52, 0.78, 16);
+const bodyMat = lit(0xc8102e);
 const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-bodyMesh.position.y = 1.1;
+bodyMesh.position.y = BODY_REST_Y;
 bodyMesh.castShadow = true;
 playerGroup.add(bodyMesh);
+addPart(playerGroup, new THREE.BoxGeometry(0.28, 0.16, 0.08), lit(0xfffdfb), 0, 0.58, 0.48);
 
-// Head
-const headGeo = new THREE.SphereGeometry(0.45, 16, 16);
-const headMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
-const headMesh = new THREE.Mesh(headGeo, headMat);
-headMesh.position.y = 2.15;
+const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 16), skinMat);
+headMesh.position.y = 1.58;
 headMesh.castShadow = true;
 playerGroup.add(headMesh);
 
-// Cap
-const capGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.18, 16);
-const capMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.5 });
-const capMesh = new THREE.Mesh(capGeo, capMat);
-capMesh.position.y = 2.5;
-playerGroup.add(capMesh);
+addPart(playerGroup, new THREE.CylinderGeometry(0.62, 0.62, 0.07, 16), lit(0x7a4324), 0, 1.92, 0.04);
+addPart(playerGroup, new THREE.CylinderGeometry(0.5, 0.52, 0.22, 16), lit(0x7a4324), 0, 2.08, 0);
+addPart(playerGroup, new THREE.CylinderGeometry(0.52, 0.52, 0.08, 16), lit(0xc8102e), 0, 2.0, 0);
+addPart(playerGroup, new THREE.SphereGeometry(0.09, 8, 8), lit(0xff8fa3), -0.28, 1.4, 0.4);
+addPart(playerGroup, new THREE.SphereGeometry(0.09, 8, 8), lit(0xff8fa3), 0.28, 1.4, 0.4);
+const smile = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.028, 6, 10, Math.PI), lit(0xd06a58));
+smile.position.set(0, 1.36, 0.5);
+smile.rotation.z = Math.PI;
+playerGroup.add(smile);
 
 // Eyes on the front of the head. Player faces local +Z, same as the held cup.
-const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.45 });
+const eyeWhiteMat = lit(0xffffff);
+const pupilMat = lit(0x1c1917);
 const eyeHighlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const headCenter = new THREE.Vector3(0, 2.15, 0);
+const headCenter = new THREE.Vector3(0, 1.6, 0);
 
 function addEye(side) {
   const outward = new THREE.Vector3(side * 0.2, 0.05, 0.4).normalize();
-  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.36));
+  const center = headCenter.clone().add(outward.clone().multiplyScalar(0.46));
 
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 16), eyeWhiteMat);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), eyeWhiteMat);
   white.position.copy(center);
   playerGroup.add(white);
 
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.078, 16, 16), pupilMat);
-  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.09));
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 16), pupilMat);
+  pupil.position.copy(center).add(outward.clone().multiplyScalar(0.12));
   playerGroup.add(pupil);
 
-  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.026, 16, 16), eyeHighlightMat);
-  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.125));
-  highlight.position.y += 0.04;
+  const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), eyeHighlightMat);
+  highlight.position.copy(center).add(outward.clone().multiplyScalar(0.16));
+  highlight.position.y += 0.045;
   highlight.position.x += side * 0.02;
   playerGroup.add(highlight);
 }
@@ -441,22 +829,22 @@ addEye(-1);
 addEye(1);
 
 // Arms hang from the shoulders. Pivots swing while walking; they stay beside the cup.
-const armMat = new THREE.MeshStandardMaterial({ color: 0xfbd38d, roughness: 0.7 });
+const armMat = skinMat;
 const ARM_REST_X = -0.38;
 
 function addArm(side) {
   const pivot = new THREE.Group();
-  pivot.position.set(side * 0.58, 1.58, 0.08);
-  pivot.rotation.z = side * 0.28;
+  pivot.position.set(side * 0.52, 1.08, 0.1);
+  pivot.rotation.z = side * 0.42;
   pivot.rotation.x = ARM_REST_X;
 
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.68, 8), armMat);
-  arm.position.y = -0.34;
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.48, 8), armMat);
+  arm.position.y = -0.24;
   arm.castShadow = true;
   pivot.add(arm);
 
-  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 16), armMat);
-  hand.position.set(0, -0.86, 0.05);
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), armMat);
+  hand.position.set(0, -0.52, 0.04);
   hand.castShadow = true;
   pivot.add(hand);
 
@@ -466,43 +854,68 @@ function addArm(side) {
 const armPivotL = addArm(1);
 const armPivotR = addArm(-1);
 
-// Held Cup Object in Character's Hands
+// Held cup sits between the hands. Toppings are visual only.
 const heldCupGroup = new THREE.Group();
-heldCupGroup.position.set(0, 1.4, 0.9);
+heldCupGroup.position.set(0, 0.72, 0.62);
 const cupMesh = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.28, 0.22, 0.65, 12),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+  new THREE.CylinderGeometry(0.24, 0.18, 0.5, 12),
+  new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 })
 );
+cupMesh.castShadow = true;
 heldCupGroup.add(cupMesh);
+const cupBand = addPart(heldCupGroup, new THREE.CylinderGeometry(0.23, 0.23, 0.06, 12), lit(0xc8102e), 0, 0.02, 0);
+const lidTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0xd7f3ff), 0, 0.24, 0);
+const whipTop = addPart(heldCupGroup, new THREE.SphereGeometry(0.16, 10, 8), lit(0xfffdfb), 0, 0.38, 0);
+lidTop.visible = false;
+whipTop.visible = false;
 heldCupGroup.visible = false;
 playerGroup.add(heldCupGroup);
 
 scene.add(playerGroup);
 
-// --- Customer NPC Character ---
+// Guest already waiting at the counter. Bubble keeps its original words.
 const customerGroup = new THREE.Group();
-customerGroup.position.set(-2, 0, 9.5); // Waiting on other side of counter
-const cBody = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 1.4, 16), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-cBody.position.y = 1.1; cBody.castShadow = true;
-customerGroup.add(cBody);
-const cHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshStandardMaterial({ color: 0xfcd34d }));
-cHead.position.y = 2.15; cHead.castShadow = true;
-customerGroup.add(cHead);
+customerGroup.position.set(-2, 0, 9.5);
+addPart(customerGroup, new THREE.CylinderGeometry(0.42, 0.48, 0.7, 14), lit(0x4aa3f0), 0, 0.7, 0);
+addPart(customerGroup, new THREE.SphereGeometry(0.5, 16, 14), skinMat, 0, 1.38, 0);
+addPart(customerGroup, new THREE.SphereGeometry(0.42, 12, 10), lit(0x6b3a22), 0, 1.68, -0.02);
+addPart(customerGroup, new THREE.SphereGeometry(0.08, 8, 8), lit(0xff8fa3), -0.22, 1.28, 0.32);
+addPart(customerGroup, new THREE.SphereGeometry(0.08, 8, 8), lit(0xff8fa3), 0.22, 1.28, 0.32);
+const guestEye = lit(0x1c1917);
+addPart(customerGroup, new THREE.SphereGeometry(0.07, 8, 8), lit(0xffffff), -0.16, 1.42, 0.4);
+addPart(customerGroup, new THREE.SphereGeometry(0.07, 8, 8), lit(0xffffff), 0.16, 1.42, 0.4);
+addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, -0.16, 1.42, 0.46);
+addPart(customerGroup, new THREE.SphereGeometry(0.035, 8, 8), guestEye, 0.16, 1.42, 0.46);
 
-// Speech Bubble over Customer
 const bubbleCanvas = document.createElement('canvas');
-bubbleCanvas.width = 256; bubbleCanvas.height = 128;
-const bctx = bubbleCanvas.getContext('2d');
-bctx.fillStyle = '#ffffff'; bctx.fillRect(0,0,256,128);
-bctx.strokeStyle = '#c8102e'; bctx.lineWidth = 6; bctx.strokeRect(4,4,248,120);
-bctx.fillStyle = '#111827'; bctx.font = 'bold 26px Arial'; bctx.textAlign = 'center';
-bctx.fillText('☕ Medium', 128, 50);
-bctx.fillText('Iced Capp', 128, 90);
-const bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
-const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex }));
-bubbleSprite.position.set(0, 3.6, 0);
-bubbleSprite.scale.set(3, 1.5, 1);
+bubbleCanvas.width = 256;
+bubbleCanvas.height = 128;
+function paintBubble() {
+  const bctx = bubbleCanvas.getContext('2d');
+  bctx.clearRect(0, 0, 256, 128);
+  bctx.fillStyle = '#fffdfb';
+  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  bctx.fill();
+  bctx.strokeStyle = '#c8102e';
+  bctx.lineWidth = 8;
+  canvasRoundRect(bctx, 8, 10, 240, 108, 40);
+  bctx.stroke();
+  bctx.fillStyle = '#4a2818';
+  bctx.font = '700 30px Fredoka, Trebuchet MS, sans-serif';
+  bctx.textAlign = 'center';
+  bctx.textBaseline = 'middle';
+  bctx.fillText('☕ Medium', 128, 46);
+  bctx.fillText('Iced Capp', 128, 84);
+  if (bubbleTex) bubbleTex.needsUpdate = true;
+}
+let bubbleTex = null;
+paintBubble();
+bubbleTex = new THREE.CanvasTexture(bubbleCanvas);
+const bubbleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, transparent: true }));
+bubbleSprite.position.set(0, 2.45, 0);
+bubbleSprite.scale.set(2.15, 1.08, 1);
 customerGroup.add(bubbleSprite);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintBubble);
 
 scene.add(customerGroup);
 
@@ -541,6 +954,7 @@ function getRandomDrink() {
 // --- Game State & Rules ---
 let score = 0;
 let revenue = 0;
+let streak = 0;
 let ticketTimer = 35;
 let currentTicket = getRandomDrink();
 
@@ -557,7 +971,7 @@ let heldItem = {
 
 // Movement Controls
 const keys = {};
-window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; unlockAudio(); });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 // Touch / Joystick
@@ -566,12 +980,17 @@ let moveVector = { x: 0, z: 0 };
 const joystickZone = document.getElementById('joystickZone');
 const joystickKnob = document.getElementById('joystickKnob');
 
-joystickZone.addEventListener('touchstart', handleTouchStart);
-joystickZone.addEventListener('touchmove', handleTouchMove);
+joystickZone.addEventListener('touchstart', handleTouchStart, { passive: false });
+joystickZone.addEventListener('touchmove', handleTouchMove, { passive: false });
 joystickZone.addEventListener('touchend', handleTouchEnd);
 
-function handleTouchStart(e) { joystickActive = true; handleTouchMove(e); }
+function handleTouchStart(e) {
+  if (e.cancelable) e.preventDefault();
+  joystickActive = true;
+  handleTouchMove(e);
+}
 function handleTouchMove(e) {
+  if (e.cancelable) e.preventDefault();
   if (!joystickActive) return;
   const touch = e.touches[0];
   const rect = joystickZone.getBoundingClientRect();
@@ -597,7 +1016,8 @@ const mouse = new THREE.Vector2();
 let targetPosition = null;
 
 window.addEventListener('pointerdown', e => {
-  if (e.target.closest('#joystickZone') || e.target.closest('.hud-top')) return;
+  unlockAudio();
+  if (e.target.closest('#joystickZone, .hud-top, button, .use-btn, .icon-btn')) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
@@ -613,9 +1033,11 @@ function showAlert(text, success = false) {
   alert.className = 'toast-alert' + (success ? ' success' : '');
   alert.style.display = 'block';
   setTimeout(() => { alert.style.display = 'none'; }, 2800);
+  reactToAlert(text, success);
 }
 
 function nextTicket() {
+  lastJuiceKey = '';
   currentTicket = getRandomDrink();
   heldItem = {
     hasCup: false,
@@ -636,6 +1058,11 @@ function nextTicket() {
 function updateTicketDisplay() {
   document.getElementById('ticketTitle').textContent = currentTicket.name;
   document.getElementById('ticketSteps').textContent = currentTicket.spec;
+  const timerEl = document.getElementById('timerVal');
+  if (timerEl) {
+    const secs = Math.max(0, Math.round(ticketTimer));
+    timerEl.textContent = '0:' + String(secs).padStart(2, '0');
+  }
 }
 
 function updateHeldDisplay() {
@@ -665,10 +1092,18 @@ function updateHeldDisplay() {
   else if (!heldItem.whipped) nextHint = 'Next: Go to Whipper Spindle';
   else if (!heldItem.sanitized) nextHint = 'Next: Sanitize Spindle!';
   document.getElementById('heldStatusTag').textContent = nextHint;
+
+  if (heldItem.javaMix) cupMesh.material.color.setHex(0xc68642);
+  else if (heldItem.dairy) cupMesh.material.color.setHex(0xf6e7c1);
+  else cupMesh.material.color.setHex(0xffffff);
+  lidTop.visible = !!heldItem.lid;
+  whipTop.visible = !!heldItem.whipped;
 }
 
 // Station Interaction Handlers
 function interactWithStation(st) {
+  bounceStation(st);
+  bouncePlayer();
   if (st.id === 'cups') {
     if (heldItem.hasCup) {
       showAlert('You are already holding a cup!');
@@ -776,6 +1211,212 @@ function interactWithStation(st) {
   }
 }
 
+// Juice stays out of Math.random so drink picks are unchanged.
+// Later passes can hang customers, coins, and XP off score / streak / currentTicket.
+let lastJuiceKey = '';
+let playerSquash = 0;
+const stationSquash = {};
+const lookTarget = new THREE.Vector3(0, 0, 0);
+let juiceSeed = 123456789;
+function juiceRand() {
+  juiceSeed = (juiceSeed * 1664525 + 1013904223) >>> 0;
+  return juiceSeed / 4294967296;
+}
+function bouncePlayer() { playerSquash = 1; }
+function bounceStation(st) { if (st) stationSquash[st.id] = 1; }
+
+let muted = false;
+try { muted = localStorage.getItem('tbr-muted') === '1'; } catch (err) { muted = false; }
+let audioCtx = null;
+function unlockAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, when, dur, type, gain) {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const osc = ctx.createOscillator();
+  const amp = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, when);
+  amp.gain.setValueAtTime(Math.max(0.0001, gain), when);
+  amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(amp);
+  amp.connect(ctx.destination);
+  osc.start(when);
+  osc.stop(when + dur + 0.02);
+}
+function playOk() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  tone(523.25, t, 0.08, 'sine', 0.055);
+  tone(659.25, t + 0.07, 0.1, 'sine', 0.045);
+}
+function playBad() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  tone(196, t, 0.12, 'triangle', 0.05);
+  tone(146, t + 0.08, 0.14, 'triangle', 0.04);
+}
+function playServe() {
+  const ctx = unlockAudio();
+  if (!ctx || muted) return;
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+    tone(freq, t + i * 0.07, 0.11, 'sine', 0.055);
+  });
+}
+function buzz(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (err) {}
+}
+function paintMute() {
+  const btn = document.getElementById('muteBtn');
+  if (!btn) return;
+  btn.textContent = muted ? '🔇' : '🔊';
+  btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+  btn.setAttribute('aria-label', muted ? 'Unmute sounds' : 'Mute sounds');
+}
+paintMute();
+document.getElementById('muteBtn').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  muted = !muted;
+  try { localStorage.setItem('tbr-muted', muted ? '1' : '0'); } catch (err) {}
+  paintMute();
+  if (!muted) playOk();
+});
+
+function paintStreak() {
+  const el = document.getElementById('streakVal');
+  if (el) el.textContent = String(streak);
+}
+const screenPoint = new THREE.Vector3();
+function worldToScreen(x, y, z) {
+  screenPoint.set(x, y, z).project(camera);
+  return {
+    x: (screenPoint.x * 0.5 + 0.5) * window.innerWidth,
+    y: (-screenPoint.y * 0.5 + 0.5) * window.innerHeight
+  };
+}
+function floatPoints(text) {
+  const el = document.createElement('div');
+  el.className = 'float-pts';
+  el.textContent = text;
+  el.style.left = (window.innerWidth * 0.56) + 'px';
+  el.style.top = (window.innerHeight * 0.5) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+function burstSparkles() {
+  const at = { x: window.innerWidth * 0.56, y: window.innerHeight * 0.46 };
+  for (let i = 0; i < 16; i++) {
+    const el = document.createElement('div');
+    el.className = 'spark';
+    el.textContent = i % 2 === 0 ? '✦' : '●';
+    el.style.left = at.x + 'px';
+    el.style.top = at.y + 'px';
+    el.style.color = i % 2 === 0 ? '#ffe08a' : '#ffffff';
+    const ang = juiceRand() * Math.PI * 2;
+    const dist = 36 + juiceRand() * 86;
+    el.style.setProperty('--dx', (Math.cos(ang) * dist) + 'px');
+    el.style.setProperty('--dy', (Math.sin(ang) * dist - 24) + 'px');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 820);
+  }
+}
+function showCombo(n) {
+  const el = document.getElementById('comboPop');
+  el.textContent = n <= 1 ? 'PERFECT!' : ('STREAK ×' + n);
+  el.classList.remove('go');
+  void el.offsetWidth;
+  el.classList.add('go');
+  clearTimeout(showCombo.timer);
+  showCombo.timer = setTimeout(() => el.classList.remove('go'), 1700);
+}
+function mistakeFx() {
+  const flash = document.getElementById('flash');
+  flash.classList.remove('on');
+  void flash.offsetWidth;
+  flash.classList.add('on');
+  const wrap = document.getElementById('canvas-container');
+  wrap.classList.remove('shake');
+  void wrap.offsetWidth;
+  wrap.classList.add('shake');
+  buzz(16);
+}
+function reactToAlert(text, success) {
+  const always = text.indexOf('Perfect Build') !== -1 || text.indexOf('New Order') !== -1;
+  if (!always && text === lastJuiceKey) return;
+  lastJuiceKey = text;
+  if (text.indexOf('Perfect Build') !== -1) {
+    streak += 1;
+    paintStreak();
+    floatPoints('+150');
+    burstSparkles();
+    showCombo(streak);
+    playServe();
+    buzz([10, 40, 16]);
+    return;
+  }
+  if (text.indexOf('New Order') !== -1) {
+    const card = document.getElementById('ticketCard');
+    card.classList.remove('pop');
+    void card.offsetWidth;
+    card.classList.add('pop');
+    return;
+  }
+  if (text.indexOf('Build Card Violation') !== -1) {
+    streak = 0;
+    paintStreak();
+    mistakeFx();
+    playBad();
+    return;
+  }
+  if (!success) {
+    mistakeFx();
+    playBad();
+    return;
+  }
+  playOk();
+  buzz(8);
+}
+
+function updateFollow() {
+  const aspectNow = window.innerWidth / Math.max(1, window.innerHeight);
+  const portrait = aspectNow < 0.9;
+  viewSize = portrait ? 12 : 14;
+  const desiredX = portrait ? playerGroup.position.x + 1.8 : 0;
+  const desiredZ = portrait ? playerGroup.position.z + 1.8 : 0;
+  const blend = portrait ? 0.12 : 1;
+  lookTarget.x += (desiredX - lookTarget.x) * blend;
+  lookTarget.z += (desiredZ - lookTarget.z) * blend;
+  camera.position.set(lookTarget.x + 20, 24, lookTarget.z + 20);
+  camera.lookAt(lookTarget.x, 0, lookTarget.z);
+  camera.left = -viewSize * aspectNow;
+  camera.right = viewSize * aspectNow;
+  camera.top = viewSize;
+  camera.bottom = -viewSize;
+  camera.updateProjectionMatrix();
+}
+
+const stepRing = document.getElementById('stepRing');
+const stepRingWrap = document.getElementById('stepRingWrap');
+document.getElementById('useBtn').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!activeStation || Date.now() - lastInteractionTime <= 1100) {
+    bouncePlayer();
+    return;
+  }
+  interactWithStation(activeStation);
+  lastInteractionTime = Date.now();
+});
+
 // Main Game Animation Loop
 let activeStation = null;
 let lastInteractionTime = 0;
@@ -821,8 +1462,9 @@ function animate() {
     const angle = Math.atan2(vx, vz);
     playerGroup.rotation.y = angle;
 
-    // Subtle run wobble
-    bodyMesh.position.y = 1.1 + Math.sin(Date.now() * 0.015) * 0.05;
+    bodyMesh.position.y = BODY_REST_Y + Math.sin(Date.now() * 0.015) * 0.05;
+  } else {
+    bodyMesh.position.y = BODY_REST_Y + Math.sin(Date.now() * 0.003) * 0.02;
   }
 
   // Visual-only arm swing. Does not change position, facing, or speed.
@@ -845,10 +1487,14 @@ function animate() {
     }
   });
 
+  activeStation = nearbyStation;
   const promptElem = document.getElementById('promptText');
   if (nearbyStation) {
     promptElem.textContent = `STAND HERE TO: ${nearbyStation.action.toUpperCase()}`;
     promptElem.style.display = 'block';
+    if (stepRingWrap) stepRingWrap.style.display = 'block';
+    const cooled = Math.min(1, (Date.now() - lastInteractionTime) / 1100);
+    if (stepRing) stepRing.style.strokeDashoffset = String(100.5 * (1 - cooled));
 
     // Auto-trigger when standing still in circle
     if (Date.now() - lastInteractionTime > 1100) {
@@ -857,21 +1503,42 @@ function animate() {
     }
   } else {
     promptElem.style.display = 'none';
+    if (stepRingWrap) stepRingWrap.style.display = 'none';
   }
 
+  if (playerSquash > 0) {
+    const k = Math.sin(playerSquash * Math.PI);
+    playerGroup.scale.set(1 + k * 0.16, 1 - k * 0.22, 1 + k * 0.16);
+    playerSquash = Math.max(0, playerSquash - 0.045);
+  } else if (playerGroup.scale.x !== 1) {
+    playerGroup.scale.set(1, 1, 1);
+  }
+  stations.forEach((st) => {
+    const j = stationSquash[st.id] || 0;
+    if (j > 0) {
+      const k = Math.sin(j * Math.PI);
+      st.mesh.scale.set(1 + k * 0.1, 1 - k * 0.16, 1 + k * 0.1);
+      stationSquash[st.id] = Math.max(0, j - 0.04);
+    } else if (st.mesh.scale.x !== 1) {
+      st.mesh.scale.set(1, 1, 1);
+    }
+  });
+
+  updateFollow();
   renderer.render(scene, camera);
 }
 
 // Window Resize
-window.addEventListener('resize', () => {
-  const aspect = window.innerWidth / window.innerHeight;
-  camera.left = -d * aspect;
-  camera.right = d * aspect;
-  camera.top = d;
-  camera.bottom = -d;
-  camera.updateProjectionMatrix();
+function frameCamera() {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  updateFollow();
+}
+window.addEventListener('resize', frameCamera);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', frameCamera);
+
+// Show the drink that was actually drawn. The 35s timer stays put; this only prints it.
+updateTicketDisplay();
 
 // Start loop
 animate();
